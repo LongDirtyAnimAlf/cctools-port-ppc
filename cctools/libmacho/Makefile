@@ -5,14 +5,14 @@ top_srcdir = ..
 
 
 
-prefix          = /home/Alfred/powerpc-apple-darwin8/usr
+prefix          = /usr/local/usr
 exec_prefix     = ${prefix}
 libdir          = ${exec_prefix}/lib
 
 CC		= gcc -m32
 AR		= ar
 RANLIB		= ranlib
-CFLAGS		= -Wno-deprecated -Wno-attributes -Wno-maybe-uninitialized -Wno-narrowing -Wno-int-conversion -Wno-address -Wall -Wno-implicit-function-declaration -Wno-format -Wno-enum-compare -Wno-unused-result -Wno-unused-variable -Wno-unused-but-set-variable -Wno-deprecated -Wno-deprecated-declarations -Wno-char-subscripts -Wno-strict-aliasing -Wno-shift-negative-value -fno-builtin-round -fno-builtin-trunc
+CFLAGS		= -fcommon -Wno-deprecated -Wno-attributes -Wno-maybe-uninitialized -Wno-narrowing -Wno-int-conversion -Wno-address -Wall -Wno-implicit-function-declaration -Wno-format -Wno-enum-compare -Wno-unused-result -Wno-unused-variable -Wno-unused-but-set-variable -Wno-deprecated -Wno-deprecated-declarations -Wno-char-subscripts -Wno-strict-aliasing -Wno-shift-negative-value -fno-builtin-round -fno-builtin-trunc
 WARNINGS	=  -Wall -Wno-long-double -Wno-import
 CPPFLAGS	= 
 DEFS		= -DHAVE_CONFIG_H -D__LITTLE_ENDIAN__=1

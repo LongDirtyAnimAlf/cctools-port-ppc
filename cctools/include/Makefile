@@ -3,7 +3,7 @@ top_builddir = ..
 srcdir = .
 top_srcdir = ..
 
-prefix	= /home/Alfred/powerpc-apple-darwin8/usr
+prefix	= /usr/local/usr
 exec_prefix	= ${prefix}
 mandir		= ${prefix}/share/man
 includedir	= ${prefix}/include

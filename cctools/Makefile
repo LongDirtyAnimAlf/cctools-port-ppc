@@ -1,16 +1,16 @@
-CFLAGS = -Wno-deprecated -Wno-attributes -Wno-maybe-uninitialized -Wno-narrowing -Wno-int-conversion -Wno-address -Wall -Wno-implicit-function-declaration -Wno-format -Wno-enum-compare -Wno-unused-result -Wno-unused-variable -Wno-unused-but-set-variable -Wno-deprecated -Wno-deprecated-declarations -Wno-char-subscripts -Wno-strict-aliasing -Wno-shift-negative-value -fno-builtin-round -fno-builtin-trunc
+CFLAGS = -fcommon -Wno-deprecated -Wno-attributes -Wno-maybe-uninitialized -Wno-narrowing -Wno-int-conversion -Wno-address -Wall -Wno-implicit-function-declaration -Wno-format -Wno-enum-compare -Wno-unused-result -Wno-unused-variable -Wno-unused-but-set-variable -Wno-deprecated -Wno-deprecated-declarations -Wno-char-subscripts -Wno-strict-aliasing -Wno-shift-negative-value -fno-builtin-round -fno-builtin-trunc
 CPPFLAGS = 
 DEFS = -DHAVE_CONFIG_H
 LDFLAGS = -m32
 
 builddir = .
-abs_builddir = /home/Alfred/xchain-master/odcctools-9.2-ld
+abs_builddir = /home/Alfred/cctools-port-ppc/cctools
 top_builddir = .
-abs_top_builddir = /home/Alfred/xchain-master/odcctools-9.2-ld
+abs_top_builddir = /home/Alfred/cctools-port-ppc/cctools
 srcdir = .
-abs_srcdir = /home/Alfred/xchain-master/odcctools-9.2-ld
+abs_srcdir = /home/Alfred/cctools-port-ppc/cctools
 top_srcdir = .
-abs_top_srcdir = /home/Alfred/xchain-master/odcctools-9.2-ld
+abs_top_srcdir = /home/Alfred/cctools-port-ppc/cctools
 
 
 

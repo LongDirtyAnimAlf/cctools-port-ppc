@@ -3,14 +3,14 @@ top_builddir = ..
 srcdir = .
 top_srcdir = ..
 
-prefix		= /home/Alfred/powerpc-apple-darwin8/usr
+prefix		= /usr/local/usr
 exec_prefix	= ${prefix}
 bindir		= ${exec_prefix}/bin
 
 
 
 CC              = gcc -m32
-CFLAGS          = -Wno-deprecated -Wno-attributes -Wno-maybe-uninitialized -Wno-narrowing -Wno-int-conversion -Wno-address -Wall -Wno-implicit-function-declaration -Wno-format -Wno-enum-compare -Wno-unused-result -Wno-unused-variable -Wno-unused-but-set-variable -Wno-deprecated -Wno-deprecated-declarations -Wno-char-subscripts -Wno-strict-aliasing -Wno-shift-negative-value -fno-builtin-round -fno-builtin-trunc
+CFLAGS          = -fcommon -Wno-deprecated -Wno-attributes -Wno-maybe-uninitialized -Wno-narrowing -Wno-int-conversion -Wno-address -Wall -Wno-implicit-function-declaration -Wno-format -Wno-enum-compare -Wno-unused-result -Wno-unused-variable -Wno-unused-but-set-variable -Wno-deprecated -Wno-deprecated-declarations -Wno-char-subscripts -Wno-strict-aliasing -Wno-shift-negative-value -fno-builtin-round -fno-builtin-trunc
 WARNINGS	=  -Wall -Wno-long-double -Wno-import
 MDYNAMICNOPIC   = 
 CPPFLAGS        = 
