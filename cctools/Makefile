@@ -4,13 +4,13 @@ DEFS = -DHAVE_CONFIG_H
 LDFLAGS = -m32
 
 builddir = .
-abs_builddir = /home/Alfred/cctools-port-ppc/cctools
+abs_builddir = /home/superdad/cctools-port-ppc/cctools
 top_builddir = .
-abs_top_builddir = /home/Alfred/cctools-port-ppc/cctools
+abs_top_builddir = /home/superdad/cctools-port-ppc/cctools
 srcdir = .
-abs_srcdir = /home/Alfred/cctools-port-ppc/cctools
+abs_srcdir = /home/superdad/cctools-port-ppc/cctools
 top_srcdir = .
-abs_top_srcdir = /home/Alfred/cctools-port-ppc/cctools
+abs_top_srcdir = /home/superdad/cctools-port-ppc/cctools
 
 
 

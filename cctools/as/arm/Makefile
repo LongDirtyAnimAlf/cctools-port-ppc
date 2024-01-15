@@ -14,7 +14,7 @@ top_builddir = ../..
 srcdir = .
 top_srcdir = ../..
 
-prefix	= /usr/local/usr
+prefix	= /usr/usr
 exec_prefix	= ${prefix}
 libexecdir	= ${exec_prefix}/libexec
 

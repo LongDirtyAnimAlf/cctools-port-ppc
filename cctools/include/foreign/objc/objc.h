@@ -38,7 +38,7 @@ typedef struct objc_object {
 } *id;
 
 
-typedef struct objc_selector 	*SEL;    
+typedef const struct objc_selector 	*SEL;
 typedef id 			(*IMP)(id, SEL, ...); 
 typedef signed char		BOOL; 
 // BOOL is explicitly signed so @encode(BOOL) == "c" rather than "C" 

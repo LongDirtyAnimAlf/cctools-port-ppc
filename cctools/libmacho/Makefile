@@ -5,7 +5,7 @@ top_srcdir = ..
 
 
 
-prefix          = /usr/local/usr
+prefix          = /usr/usr
 exec_prefix     = ${prefix}
 libdir          = ${exec_prefix}/lib
 

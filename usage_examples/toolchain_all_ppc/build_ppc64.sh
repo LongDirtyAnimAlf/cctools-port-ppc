@@ -32,15 +32,27 @@ REALDIR=$(readlink -f $SRCDIR)
 
 
 cd $REALDIR
-make clean 2>&1
 
 mkdir -p cctools-build/$target
 cd cctools-build/$target
+make clean 2>&1
 
 $REALDIR/configure --prefix=$prefix --target=$target \
     --enable-ld64 \
     2>&1 | tee cctools_configure.log
 
-
+make clean 2>&1 | tee cctools_make.log
 make 2>&1 | tee cctools_make.log
 make install 2>&1 | tee cctools_install.log
+
+if [ "$OSTYPE" == "cygwin" ]; then
+    cp /bin/cygcrypto-1.1.dll $prefix/bin
+    cp /bin/cyggcc_s-1.dll $prefix/bin
+    cp /bin/cygstdc++-6.dll $prefix/bin
+    cp /bin/cygwin1.dll $prefix/bin
+    cp /bin/cygz.dll $prefix/bin
+    for astarget in arm i386 ppc ppc64 x86_64; do
+        cp /bin/cyggcc_s-1.dll $prefix/libexec/gcc/darwin/$astarget
+        cp /bin/cygwin1.dll $prefix/libexec/gcc/darwin/$astarget
+    done 
+fi

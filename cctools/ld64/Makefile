@@ -3,7 +3,7 @@ top_builddir = ..
 srcdir = .
 top_srcdir = ..
 
-prefix		= /usr/local/usr
+prefix		= /usr/usr
 exec_prefix	= ${prefix}
 bindir		= ${exec_prefix}/bin
 
