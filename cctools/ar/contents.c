@@ -75,10 +75,15 @@ static char rcsid[] = "$OpenBSD: contents.c,v 1.2 1996/06/26 05:31:19 deraadt Ex
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
+#include <tzfile.h>
 #include <unistd.h>
 
 #include "archive.h"
 #include "extern.h"
+
+#ifndef HAVE_STRMODE /* cctools-port */
+extern void strmode(int mode, char *p);
+#endif
 
 /*
  * contents --
@@ -93,7 +98,7 @@ contents(argv)
 	struct tm *tp;
 	char *file, buf[25];
 	
-	afd = open_archive(O_RDONLY);
+	afd = open_archive(O_RDONLY | O_BINARY);
 
 	for (all = !*argv; get_arobj(afd);) {
 		if (all)
@@ -112,7 +117,7 @@ contents(argv)
 		if (!all && !*argv)
 			break;
 next:		skip_arobj(afd);
-	} 
+	}
 	close_archive(afd);
 
 	if (*argv) {

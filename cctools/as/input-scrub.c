@@ -113,7 +113,7 @@ void)
 
   buffer_length = input_file_buffer_size ();
 
-  buffer_start = xmalloc ((long)(BEFORE_SIZE + buffer_length + buffer_length + AFTER_SIZE));
+  buffer_start = xmalloc ((size_t)(BEFORE_SIZE + buffer_length + buffer_length + AFTER_SIZE));
   memcpy(buffer_start, BEFORE_STRING, (int)BEFORE_SIZE);
 
   /* Line number things. */
@@ -177,6 +177,7 @@ input_scrub_next_buffer(
 char **bufp)
 {
   register char *	limit;	/* -> just after last char of buffer. */
+  int give_next_size;
 
   if (partial_size)
     {
@@ -184,11 +185,12 @@ char **bufp)
       memcpy(buffer_start + BEFORE_SIZE, save_source, (int)AFTER_SIZE);
     }
 get_more:
-  limit = input_file_give_next_buffer (buffer_start + BEFORE_SIZE + partial_size);
+  limit = input_file_give_next_buffer(
+		buffer_start + BEFORE_SIZE + partial_size,
+		&give_next_size);
   if (limit)
     {
       register char *	p;	/* Find last newline. */
-
       for (p = limit;   * -- p != '\n';   )
 	{
 	}
@@ -199,9 +201,19 @@ get_more:
 	
 	  new = limit - (buffer_start + BEFORE_SIZE + partial_size);
 	  partial_size += new;
+
+	  /*
+	   * If there is enough room left in this buffer for what
+	   * input_file_give_next_buffer() will need don't reallocate as we
+	   * could run out of memory needlessly.
+	   */
+	  if((BEFORE_SIZE + buffer_length * 2) - (limit - buffer_start) >
+	     give_next_size)
+	      goto get_more;
+
   	  buffer_length = buffer_length * 2;
   	  buffer_start = xrealloc (buffer_start,
-				   (long)(BEFORE_SIZE + buffer_length +
+				   (size_t)(BEFORE_SIZE + buffer_length +
 					  buffer_length + AFTER_SIZE));
 	  *bufp = buffer_start + BEFORE_SIZE;
 	  goto get_more;
@@ -338,7 +350,7 @@ int *line)
     char *p, *q;
     static char directory_buf[MAXPATHLEN];
 
-	getwd(directory_buf);
+	getcwd(directory_buf, sizeof(directory_buf)); /* cctools-port: getwd() -> getcwd() */
 	*fileName = NULL;
 	*directory = directory_buf;
 	*line = 0;
@@ -372,13 +384,15 @@ char *filename)
   fprintf (stderr,"as:file(%s) %s! ",
 	   filename, gripe
 	   );
-  if (errno > sys_nerr)
+  int xerrno = errno;
+  char errbuf[64];
+  if (strerror_r (errno, errbuf, sizeof(errbuf))) /* cctools-port: if (errno > sys_nerr) -> strerror_r() */
     {
-      fprintf (stderr, "Unknown error #%d.", errno);
+      fprintf (stderr, "Unknown error #%d.", xerrno); /* cctools-port: errno -> xerrno */
     }
   else
     {
-      fprintf (stderr, "%s.", sys_errlist [errno]);
+      fprintf (stderr, "%s.", errbuf); /* cctools-port: sys_errlist [errno] -> errbuf */
     }
   (void)putc('\n', stderr);
   errno = 0;			/* After reporting, clear it. */
@@ -392,30 +406,12 @@ char *filename)
 
 #ifdef NeXT_MOD	/* .include feature */
 /* DJA -- added for .include pseudo op support */
-void
-read_an_include_file(
+char *
+find_an_include_file(
 char *no_path_name)
 {
-  char		      			* buffer;
-  char		      			* last_buffer_limit;
-  char	   	      			* last_buffer_start;
-  int					  last_doing_include;
-  FILE	  	      			* last_f_in;
-  char	  	      			* last_file_name;
-  char		      			* last_input_line_pointer;
-  char	   	      			* last_logical_input_file;
-  line_numberT				  last_logical_input_line;
-  int	 				  last_partial_size;
-  char	  	      			* last_partial_where;
-  char	 	      			* last_physical_input_file;
-  line_numberT				  last_physical_input_line;
-  char	 				  last_save_source [AFTER_SIZE];
-  int					  last_buffer_length;
-#if 0
-  char					* last_save_buffer;
-#endif
-  char					  name_buffer [MAXPATHLEN];
-  scrub_context_data			  scrub_context;
+  /* cctools-port: added static keyword */
+  static char				name_buffer [MAXPATHLEN];
   register struct directory_stack	* the_path_pointer;
   register char				* whole_file_name;
 
@@ -471,9 +467,42 @@ char *no_path_name)
 	  the_path_pointer++;
 	}
       as_fatal ("Couldn't find the include file: \"%s\"", no_path_name);
-      return;
+      return (NULL);
     }
 found:
+  return (whole_file_name);
+}
+
+void
+read_an_include_file(
+char *no_path_name)
+{
+  char		      			* buffer;
+  char		      			* last_buffer_limit;
+  char	   	      			* last_buffer_start;
+  int					  last_doing_include;
+  FILE	  	      			* last_f_in;
+  char	  	      			* last_file_name;
+  char		      			* last_input_line_pointer;
+  char	   	      			* last_logical_input_file;
+  line_numberT				  last_logical_input_line;
+  int	 				  last_partial_size;
+  char	  	      			* last_partial_where;
+  char	 	      			* last_physical_input_file;
+  line_numberT				  last_physical_input_line;
+  char	 				  last_save_source [AFTER_SIZE];
+  int					  last_buffer_length;
+#if 0
+  char					* last_save_buffer;
+#endif
+  scrub_context_data			  scrub_context;
+  register char				* whole_file_name;
+
+ /*
+  * figure out what directory the file name is in.
+  */
+  whole_file_name = find_an_include_file (no_path_name);
+
  /*
   * save a copy of the file state for a recursive call to read a file
   */

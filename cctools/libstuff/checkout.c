@@ -23,10 +23,11 @@
 #ifndef RLD
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
+#include "../include/xar/xar.h" /* cctools-port: 
+				   force the use of the bundled xar header */
 #include "stuff/ofile.h"
 #include "stuff/breakout.h"
-#include "stuff/round.h"
+#include "stuff/rnd.h"
 
 static void check_object(
     struct arch *arch,
@@ -52,9 +53,9 @@ __private_extern__
 void
 checkout(
 struct arch *archs,
-unsigned long narchs)
+uint32_t narchs)
 {
-    unsigned long i, j;
+    uint32_t i, j;
 
 	for(i = 0; i < narchs; i++){
 	    if(archs[i].type == OFILE_ARCHIVE){
@@ -78,7 +79,7 @@ struct arch *arch,
 struct member *member,
 struct object *object)
 {
-    unsigned long i, ncmds, flags;
+    uint32_t i, ncmds, flags;
     struct load_command *lc;
     struct segment_command *sg;
     struct segment_command_64 *sg64;
@@ -91,6 +92,8 @@ struct object *object)
 	object->st = NULL;
 	object->dyst = NULL;
 	object->hints_cmd = NULL;
+	object->seg_bitcode = NULL;
+	object->seg_bitcode64 = NULL;
 	object->seg_linkedit = NULL;
 	object->seg_linkedit64 = NULL;
 	object->code_sig_cmd = NULL;
@@ -135,6 +138,40 @@ struct object *object)
 			"LC_SEGMENT_SPLIT_INFO load command): ");
 		object->split_info_cmd = (struct linkedit_data_command *)lc;
 	    }
+	    else if(lc->cmd == LC_FUNCTION_STARTS){
+		if(object->func_starts_info_cmd != NULL)
+		    fatal_arch(arch, member, "malformed file (more than one "
+			"LC_FUNCTION_STARTS load command): ");
+		object->func_starts_info_cmd =
+			(struct linkedit_data_command *)lc;
+	    }
+	    else if(lc->cmd == LC_DATA_IN_CODE){
+		if(object->data_in_code_cmd != NULL)
+		    fatal_arch(arch, member, "malformed file (more than one "
+			"LC_DATA_IN_CODE load command): ");
+		object->data_in_code_cmd =
+			(struct linkedit_data_command *)lc;
+	    }
+	    else if(lc->cmd == LC_DYLIB_CODE_SIGN_DRS){
+		if(object->code_sign_drs_cmd != NULL)
+		    fatal_arch(arch, member, "malformed file (more than one "
+			"LC_DYLIB_CODE_SIGN_DRS load command): ");
+		object->code_sign_drs_cmd =
+			(struct linkedit_data_command *)lc;
+	    }
+	    else if(lc->cmd == LC_LINKER_OPTIMIZATION_HINT){
+		if(object->link_opt_hint_cmd != NULL)
+		    fatal_arch(arch, member, "malformed file (more than one "
+			"LC_LINKER_OPTIMIZATION_HINT load command): ");
+		object->link_opt_hint_cmd =
+			(struct linkedit_data_command *)lc;
+	    }
+	    else if((lc->cmd == LC_DYLD_INFO) ||(lc->cmd == LC_DYLD_INFO_ONLY)){
+		if(object->dyld_info != NULL)
+		    fatal_arch(arch, member, "malformed file (more than one "
+			"LC_DYLD_INFO load command): ");
+		object->dyld_info = (struct dyld_info_command *)lc;
+	    }
 	    else if(lc->cmd == LC_SEGMENT){
 		sg = (struct segment_command *)lc;
 		if(strcmp(sg->segname, SEG_LINKEDIT) == 0){
@@ -142,6 +179,12 @@ struct object *object)
 			fatal_arch(arch, member, "malformed file (more than "
 			    "one " SEG_LINKEDIT "segment): ");
 		    object->seg_linkedit = sg;
+		}
+		else if(strcmp(sg->segname, "__LLVM") == 0){
+		    if(object->seg_bitcode != NULL)
+			fatal_arch(arch, member, "malformed file (more than "
+			    "one __LLVM segment): ");
+		    object->seg_bitcode = sg;
 		}
 	    }
 	    else if(lc->cmd == LC_SEGMENT_64){
@@ -152,6 +195,12 @@ struct object *object)
 			    "one " SEG_LINKEDIT "segment): ");
 		    object->seg_linkedit64 = sg64;
 		}
+		else if(strcmp(sg64->segname, "__LLVM") == 0){
+		    if(object->seg_bitcode64 != NULL)
+			fatal_arch(arch, member, "malformed file (more than "
+			    "one __LLVM segment): ");
+		    object->seg_bitcode64 = sg64;
+		}
 	    }
 	    else if(lc->cmd == LC_ID_DYLIB){
 		if(dl_id != NULL)
@@ -160,7 +209,7 @@ struct object *object)
 		dl_id = (struct dylib_command *)lc;
 		if(dl_id->dylib.name.offset >= dl_id->cmdsize)
 		    fatal_arch(arch, member, "malformed file (name.offset of "
-			"load command %lu extends past the end of the load "
+			"load command %u extends past the end of the load "
 			"command): ", i);
 	    }
 	    lc = (struct load_command *)((char *)lc + lc->cmdsize);
@@ -270,6 +319,7 @@ struct object *object)
 		 *	string table
 		 *		strings for external symbols
 		 *		strings for local symbols
+		 *		code signature
 		 */
 		symbol_string_at_end(arch, member, object);
 	    }
@@ -283,7 +333,7 @@ struct arch *arch,
 struct member *member,
 struct object *object)
 {
-    unsigned long offset, rounded_offset, isym;
+    uint32_t offset, rounded_offset, isym;
 
 	if(object->mh != NULL){
 	    if(object->seg_linkedit == NULL)
@@ -297,6 +347,21 @@ struct object *object)
 		    "be processed) in: ");
 
 	    offset = object->seg_linkedit->fileoff;
+
+	    if(object->seg_bitcode != NULL){
+		if(object->seg_bitcode->filesize < sizeof(struct xar_header))
+		    fatal_arch(arch, member, "the __LLVM segment too small "
+			       "(less than sizeof(struct xar_header)) in: ");
+		if(object->seg_bitcode->fileoff +
+		   object->seg_bitcode->filesize != offset)
+		    fatal_arch(arch, member, "the __LLVM segment not directly "
+			       "before the "  SEG_LINKEDIT " segment in: ");
+		if(object->seg_bitcode->vmaddr +
+		   object->seg_bitcode->vmsize != object->seg_linkedit->vmaddr)
+		    fatal_arch(arch, member, "the __LLVM segment's vmaddr plus "
+			       "vmsize not directly before the vmaddr of the "
+			       SEG_LINKEDIT " segment in: ");
+	    }
 	}
 	else{
 	    if(object->seg_linkedit64 == NULL)
@@ -310,6 +375,58 @@ struct object *object)
 		    "be processed) in: ");
 
 	    offset = object->seg_linkedit64->fileoff;
+
+	    if(object->seg_bitcode64 != NULL){
+		if(object->seg_bitcode64->filesize < sizeof(struct xar_header))
+		    fatal_arch(arch, member, "the __LLVM segment too small "
+			       "(less than sizeof(struct xar_header)) in: ");
+		if(object->seg_bitcode64->fileoff +
+		   object->seg_bitcode64->filesize != offset)
+		    fatal_arch(arch, member, "the __LLVM segment not directly "
+			       "before the "  SEG_LINKEDIT " segment in: ");
+		if(object->seg_bitcode64->vmaddr +
+		   object->seg_bitcode64->vmsize !=
+						object->seg_linkedit64->vmaddr)
+		    fatal_arch(arch, member, "the __LLVM segment's vmaddr plus "
+			       "vmsize not directly before the vmaddr of the "
+			       SEG_LINKEDIT " segment in: ");
+	    }
+	}
+	if(object->dyld_info != NULL){
+	    /* dyld_info starts at beginning of __LINKEDIT */
+	    if (object->dyld_info->rebase_off != 0){
+		if (object->dyld_info->rebase_off != offset)
+		    order_error(arch, member, "dyld_info "
+			"out of place");
+	    }
+	    else if (object->dyld_info->bind_off != 0){
+		if (object->dyld_info->bind_off != offset)
+		    order_error(arch, member, "dyld_info "
+			"out of place");
+	    }
+	    else if(object->dyld_info->export_off != 0){
+		if(object->dyld_info->export_off != offset &&
+		   object->dyld_info->weak_bind_size != 0 &&
+		   object->dyld_info->lazy_bind_size != 0)
+		    order_error(arch, member, "dyld_info "
+			"out of place");
+	    }
+	    /* update offset to end of dyld_info contents */
+	    if (object->dyld_info->export_size != 0)
+		offset = object->dyld_info->export_off + 
+			    object->dyld_info->export_size;
+	    else if (object->dyld_info->lazy_bind_size != 0)
+		offset = object->dyld_info->lazy_bind_off + 
+			    object->dyld_info->lazy_bind_size;
+	    else if (object->dyld_info->weak_bind_size != 0)
+		offset = object->dyld_info->weak_bind_off + 
+			    object->dyld_info->weak_bind_size;
+	    else if (object->dyld_info->bind_size != 0)
+		offset = object->dyld_info->bind_off + 
+			    object->dyld_info->bind_size;
+	    else if (object->dyld_info->rebase_size != 0)
+		offset = object->dyld_info->rebase_off + 
+			    object->dyld_info->rebase_size;
 	}
 	if(object->dyst->nlocrel != 0){
 	    if(object->dyst->locreloff != offset)
@@ -319,9 +436,35 @@ struct object *object)
 		      sizeof(struct relocation_info);
 	}
 	if(object->split_info_cmd != NULL){
-	    if(object->split_info_cmd->dataoff != offset)
+	    if(object->split_info_cmd->dataoff != 0 &&
+	       object->split_info_cmd->dataoff != offset)
 		order_error(arch, member, "split info data out of place");
 	    offset += object->split_info_cmd->datasize;
+	}
+	if(object->func_starts_info_cmd != NULL){
+	    if(object->func_starts_info_cmd->dataoff != 0 &&
+	       object->func_starts_info_cmd->dataoff != offset)
+		order_error(arch, member, "function starts data out of place");
+	    offset += object->func_starts_info_cmd->datasize;
+	}
+	if(object->data_in_code_cmd != NULL){
+	    if(object->data_in_code_cmd->dataoff != 0 &&
+	       object->data_in_code_cmd->dataoff != offset)
+		order_error(arch, member, "data in code info out of place");
+	    offset += object->data_in_code_cmd->datasize;
+	}
+	if(object->code_sign_drs_cmd != NULL){
+	    if(object->code_sign_drs_cmd->dataoff != 0 &&
+	       object->code_sign_drs_cmd->dataoff != offset)
+		order_error(arch, member, "code signing DRs info out of place");
+	    offset += object->code_sign_drs_cmd->datasize;
+	}
+	if(object->link_opt_hint_cmd != NULL){
+	    if(object->link_opt_hint_cmd->dataoff != 0 &&
+	       object->link_opt_hint_cmd->dataoff != offset)
+		order_error(arch, member, "linker optimization hint info out "
+					  "of place");
+	    offset += object->link_opt_hint_cmd->datasize;
 	}
 	if(object->st->nsyms != 0){
 	    if(object->st->symoff != offset)
@@ -377,7 +520,7 @@ struct object *object)
  	object->input_indirectsym_pad = 0;
 	if(object->mh64 != NULL &&
 	   (object->dyst->nindirectsyms % 2) != 0){
-	    rounded_offset = round(offset, 8);
+	    rounded_offset = rnd(offset, 8);
 	}
 	else{
 	    rounded_offset = offset;
@@ -453,7 +596,7 @@ struct object *object)
 	    }
 	}
 	if(object->code_sig_cmd != NULL){
-	    rounded_offset = round(rounded_offset, 16);
+	    rounded_offset = rnd(rounded_offset, 16);
 	    if(object->code_sig_cmd->dataoff != rounded_offset)
 		order_error(arch, member, "code signature data out of place");
 	    rounded_offset += object->code_sig_cmd->datasize;
@@ -483,11 +626,31 @@ struct arch *arch,
 struct member *member,
 struct object *object)
 {
-    unsigned long end, strend, rounded_strend;
-    unsigned long indirectend, rounded_indirectend;
+    uint32_t end, sigend, strend, rounded_strend;
+    uint32_t indirectend, rounded_indirectend;
 
 	if(object->st != NULL && object->st->nsyms != 0){
 	    end = object->object_size;
+	    if(object->code_sig_cmd != NULL){
+		sigend = object->code_sig_cmd->dataoff +
+			 object->code_sig_cmd->datasize;
+		if(sigend != end)
+		    fatal_arch(arch, member, "code signature not at the end "
+			"of the file (can't be processed) in file: ");
+		/*
+		 * The code signature starts at a 16 byte offset.  So if the
+		 * string table end rouned to 16 bytes is the offset where the 
+		 * code signature starts then just back up the current "end" to
+		 * the end of the string table.
+		 */
+		end = object->code_sig_cmd->dataoff;
+		if(object->st->strsize != 0){
+		    strend = object->st->stroff + object->st->strsize;
+		    rounded_strend = rnd(strend, 16);
+		    if(object->code_sig_cmd->dataoff == rounded_strend)
+		       end = strend;
+		}
+	    }
 	    if(object->st->strsize != 0){
 		strend = object->st->stroff + object->st->strsize;
 		/*
@@ -495,7 +658,7 @@ struct object *object)
 		 * string table may not be exactly at the end of the
 		 * object_size due to rounding.
 		 */
-		rounded_strend = round(strend, 8);
+		rounded_strend = rnd(strend, 8);
 		if(strend != end && rounded_strend != end)
 		    fatal_arch(arch, member, "string table not at the end "
 			"of the file (can't be processed) in file: ");
@@ -504,9 +667,10 @@ struct object *object)
 		 * at the end of the object file change the object_size to be
 		 * the end of the string table here.  This could be done at the
 		 * end of this routine but since all the later checks are fatal
-		 * we'll just do this here.
+		 * we'll just do this here.  If there is a code signature after
+		 * string table don't do this.
 		 */
-		if(rounded_strend != strend)
+		if(rounded_strend != strend && object->code_sig_cmd == NULL)
 		    object->object_size = strend;
 		end = object->st->stroff;
 	    }
@@ -519,14 +683,15 @@ struct object *object)
 		    object->dyst->nindirectsyms * sizeof(uint32_t);
 
 		/*
-		 * If this is a 64-bit Mach-O file and has an odd number of indirect
-		 * symbol table entries the next offset MAYBE rounded to a multiple of
-		 * 8 or MAY NOT BE. This should done to keep all the tables aligned but
-		 * was not done for 64-bit Mach-O in Mac OS X 10.4.
+		 * If this is a 64-bit Mach-O file and has an odd number of
+		 * indirect symbol table entries the next offset MAYBE rounded
+		 * to a multiple of 8 or MAY NOT BE. This should done to keep
+		 * all the tables aligned but was not done for 64-bit Mach-O in
+		 * Mac OS X 10.4.
 		 */
 		if(object->mh64 != NULL &&
 		   (object->dyst->nindirectsyms % 2) != 0){
-		    rounded_indirectend = round(indirectend, 8);
+		    rounded_indirectend = rnd(indirectend, 8);
 		}
 		else{
 		    rounded_indirectend = indirectend;

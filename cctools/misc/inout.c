@@ -25,7 +25,7 @@
 #include <string.h>
 #include "stuff/errors.h"
 #include "stuff/breakout.h"
-#include "stuff/round.h"
+#include "stuff/rnd.h"
 
 /* used by error routines as the name of the program */
 char *progname = NULL;
@@ -35,7 +35,7 @@ static void usage(
 
 static void process(
     struct arch *archs,
-    unsigned long narchs);
+    uint32_t narchs);
 
 static void setup_object_symbolic_info(
     struct object *object);
@@ -46,10 +46,10 @@ int argc,
 char **argv,
 char **envp)
 {
-    unsigned long i;
+    uint32_t i;
     char *input, *output;
     struct arch *archs;
-    unsigned long narchs;
+    uint32_t narchs;
 
 	progname = argv[0];
 	input = NULL;
@@ -89,7 +89,7 @@ char **envp)
 
 	process(archs, narchs);
 
-	writeout(archs, narchs, output, 0777, TRUE, FALSE, FALSE, NULL);
+	writeout(archs, narchs, output, 0777, TRUE, FALSE, FALSE, FALSE, NULL);
 
 	if(errors)
 	    return(EXIT_FAILURE);
@@ -113,10 +113,12 @@ static
 void
 process(
 struct arch *archs,
-unsigned long narchs)
+uint32_t narchs)
 {
-    unsigned long i, j, offset, size;
+    uint32_t i, j, offset, size;
     struct object *object;
+    struct ar_hdr h;
+    char size_buf[sizeof(h.ar_size) + 1];
 
 	for(i = 0; i < narchs; i++){
 	    if(archs[i].type == OFILE_ARCHIVE){
@@ -134,23 +136,23 @@ unsigned long narchs)
 		    archs[i].members[j].offset = offset;
 		    size = 0;
 		    if(archs[i].members[j].member_long_name == TRUE){
-			size = round(archs[i].members[j].member_name_size,
-				     sizeof(long));
+			size = rnd(archs[i].members[j].member_name_size,
+				     sizeof(int32_t));
 			archs[i].toc_long_name = TRUE;
 		    }
 		    if(archs[i].members[j].object != NULL){
 			size += archs[i].members[j].object->object_size
 			   - archs[i].members[j].object->input_sym_info_size
 			   + archs[i].members[j].object->output_sym_info_size;
-			sprintf(archs[i].members[j].ar_hdr->ar_size, "%-*ld",
-			       (int)sizeof(archs[i].members[j].ar_hdr->ar_size),
-			       (long)(size));
+			sprintf(size_buf, "%-*ld",
+			   (int)sizeof(archs[i].members[j].ar_hdr->ar_size),
+			   (long)(size));
 			/*
 			 * This has to be done by hand because sprintf puts a
 			 * null at the end of the buffer.
 			 */
-			memcpy(archs[i].members[j].ar_hdr->ar_fmag, ARFMAG,
-			      (int)sizeof(archs[i].members[j].ar_hdr->ar_fmag));
+			memcpy(archs[i].members[j].ar_hdr->ar_size, size_buf,
+			   (int)sizeof(archs[i].members[j].ar_hdr->ar_size));
 		    }
 		    else{
 			size += archs[i].members[j].unknown_size;
@@ -171,7 +173,7 @@ void
 setup_object_symbolic_info(
 struct object *object)
 {
-    unsigned long output_indirectsym_pad_diff;
+    uint32_t output_indirectsym_pad_diff;
 
 	if(object->st != NULL && object->st->nsyms != 0){
 	    if(object->mh != NULL){
@@ -225,6 +227,30 @@ struct object *object)
 		object->output_split_info_data_size = 
 		    object->split_info_cmd->datasize;
 	    }
+	    if(object->func_starts_info_cmd != NULL){
+		object->output_func_start_info_data = 
+		(object->object_addr + object->func_starts_info_cmd->dataoff);
+		object->output_func_start_info_data_size = 
+		    object->func_starts_info_cmd->datasize;
+	    }
+	    if(object->data_in_code_cmd != NULL){
+		object->output_data_in_code_info_data = 
+		(object->object_addr + object->data_in_code_cmd->dataoff);
+		object->output_data_in_code_info_data_size = 
+		    object->data_in_code_cmd->datasize;
+	    }
+	    if(object->code_sign_drs_cmd != NULL){
+		object->output_code_sign_drs_info_data = 
+		(object->object_addr + object->code_sign_drs_cmd->dataoff);
+		object->output_code_sign_drs_info_data_size = 
+		    object->code_sign_drs_cmd->datasize;
+	    }
+	    if(object->link_opt_hint_cmd != NULL){
+		object->output_link_opt_hint_info_data = 
+		(object->object_addr + object->link_opt_hint_cmd->dataoff);
+		object->output_link_opt_hint_info_data_size = 
+		    object->link_opt_hint_cmd->datasize;
+	    }
 	    object->output_ext_relocs = (struct relocation_info *)
 		(object->object_addr + object->dyst->extreloff);
 	    object->output_tocs =
@@ -267,19 +293,31 @@ struct object *object)
 		    sizeof(struct dylib_reference);
 	    if(object->split_info_cmd != NULL)
 		object->input_sym_info_size += object->split_info_cmd->datasize;
+	    if(object->func_starts_info_cmd != NULL)
+		object->input_sym_info_size +=
+		    object->func_starts_info_cmd->datasize;
+	    if(object->data_in_code_cmd != NULL)
+		object->input_sym_info_size +=
+		    object->data_in_code_cmd->datasize;
+	    if(object->code_sign_drs_cmd != NULL)
+		object->input_sym_info_size +=
+		    object->code_sign_drs_cmd->datasize;
+	    if(object->link_opt_hint_cmd != NULL)
+		object->input_sym_info_size +=
+		    object->link_opt_hint_cmd->datasize;
 	    if(object->mh != NULL){
 		object->input_sym_info_size +=
 		    object->dyst->nmodtab *
 			sizeof(struct dylib_module) +
 		    object->dyst->nindirectsyms *
-			sizeof(unsigned long);
+			sizeof(uint32_t);
 	    }
 	    else{
 		object->input_sym_info_size +=
 		    object->dyst->nmodtab *
 			sizeof(struct dylib_module_64)+
 		    object->dyst->nindirectsyms *
-			  sizeof(unsigned long) +
+			  sizeof(uint32_t) +
 		    object->input_indirectsym_pad;
 		    if(object->input_indirectsym_pad == 0 &&
 		       (object->dyst->nindirectsyms % 2) != 0)
@@ -291,7 +329,7 @@ struct object *object)
 		    sizeof(struct twolevel_hint);
 	    }
 	    if(object->code_sig_cmd != NULL){
-		object->input_sym_info_size = round(object->input_sym_info_size,
+		object->input_sym_info_size = rnd(object->input_sym_info_size,
 						    16);
 		object->input_sym_info_size += object->code_sig_cmd->datasize;
 	    }

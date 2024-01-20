@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2008 Apple Inc.  All Rights Reserved.
+ * Copyright (c) 1999-2010 Apple Inc.  All Rights Reserved.
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
@@ -119,6 +119,7 @@ struct mach_header_64 {
 					/*  linking only, no section contents */
 #define	MH_DSYM		0xa		/* companion file with only debug */
 					/*  sections */
+#define	MH_KEXT_BUNDLE	0xb		/* x86_64 kexts */
 
 /* Constants for the flags field of the mach_header */
 #define	MH_NOUNDEFS	0x1		/* the object file has no undefined
@@ -189,6 +190,25 @@ struct mach_header_64 {
 					   load the main executable at a
 					   random address.  Only used in
 					   MH_EXECUTE filetypes. */
+#define	MH_DEAD_STRIPPABLE_DYLIB 0x400000 /* Only for use on dylibs.  When
+					     linking against a dylib that
+					     has this bit set, the static linker
+					     will automatically not create a
+					     LC_LOAD_DYLIB load command to the
+					     dylib if no symbols are being
+					     referenced from the dylib. */
+#define MH_HAS_TLV_DESCRIPTORS 0x800000 /* Contains a section of type 
+					    S_THREAD_LOCAL_VARIABLES */
+
+#define MH_NO_HEAP_EXECUTION 0x1000000	/* When this bit is set, the OS will
+					   run the main executable with
+					   a non-executable heap even on
+					   platforms (e.g. i386) that don't
+					   require it. Only used in MH_EXECUTE
+					   filetypes. */
+
+#define MH_APP_EXTENSION_SAFE 0x02000000 /* The code was linked for use in an
+					    application extension. */
 
 /*
  * The load commands directly follow the mach_header.  The total size of all
@@ -248,7 +268,6 @@ struct load_command {
 #define	LC_SUB_LIBRARY  0x15	/* sub library */
 #define	LC_TWOLEVEL_HINTS 0x16	/* two-level namespace lookup hints */
 #define	LC_PREBIND_CKSUM  0x17	/* prebind checksum */
-#define	LC_ENCRYPTION_INFO 0x21	/* encrypted segment information */
 
 /*
  * load a dynamically linked shared library that is allowed to be missing
@@ -264,6 +283,25 @@ struct load_command {
 #define LC_CODE_SIGNATURE 0x1d	/* local of code signature */
 #define LC_SEGMENT_SPLIT_INFO 0x1e /* local of info to split segments */
 #define LC_REEXPORT_DYLIB (0x1f | LC_REQ_DYLD) /* load and re-export dylib */
+#define	LC_LAZY_LOAD_DYLIB 0x20	/* delay load of dylib until first use */
+#define	LC_ENCRYPTION_INFO 0x21	/* encrypted segment information */
+#define	LC_DYLD_INFO 	0x22	/* compressed dyld information */
+#define	LC_DYLD_INFO_ONLY (0x22|LC_REQ_DYLD)	/* compressed dyld information only */
+#define	LC_LOAD_UPWARD_DYLIB (0x23 | LC_REQ_DYLD) /* load upward dylib */
+#define LC_VERSION_MIN_MACOSX 0x24   /* build for MacOSX min OS version */
+#define LC_VERSION_MIN_IPHONEOS 0x25 /* build for iPhoneOS min OS version */
+#define LC_FUNCTION_STARTS 0x26 /* compressed table of function start addresses */
+#define LC_DYLD_ENVIRONMENT 0x27 /* string for dyld to treat
+				    like environment variable */
+#define LC_MAIN (0x28|LC_REQ_DYLD) /* replacement for LC_UNIXTHREAD */
+#define LC_DATA_IN_CODE 0x29 /* table of non-instructions in __text */
+#define LC_SOURCE_VERSION 0x2A /* source version used to build binary */
+#define LC_DYLIB_CODE_SIGN_DRS 0x2B /* Code signing DRs copied from linked dylibs */
+#define	LC_ENCRYPTION_INFO_64 0x2C /* 64-bit encrypted segment information */
+#define LC_LINKER_OPTION 0x2D /* linker options in MH_OBJECT files */
+#define LC_LINKER_OPTIMIZATION_HINT 0x2E /* optimization hints in MH_OBJECT files */
+#define LC_VERSION_MIN_TVOS 0x2F /* build for AppleTV min OS version */
+#define LC_VERSION_MIN_WATCHOS 0x30 /* build for Watch min OS version */
 
 /*
  * A variable length string in a load command is represented by an lc_str
@@ -450,6 +488,23 @@ struct section_64 { /* for 64-bit architectures */
 						   literals */
 #define	S_DTRACE_DOF			0xf	/* section contains 
 						   DTrace Object Format */
+#define	S_LAZY_DYLIB_SYMBOL_POINTERS	0x10	/* section with only lazy
+						   symbol pointers to lazy
+						   loaded dylibs */
+/*
+ * Section types to support thread local variables
+ */
+#define S_THREAD_LOCAL_REGULAR                   0x11  /* template of initial 
+							  values for TLVs */
+#define S_THREAD_LOCAL_ZEROFILL                  0x12  /* template of initial 
+							  values for TLVs */
+#define S_THREAD_LOCAL_VARIABLES                 0x13  /* TLV descriptors */
+#define S_THREAD_LOCAL_VARIABLE_POINTERS         0x14  /* pointers to TLV 
+                                                          descriptors */
+#define S_THREAD_LOCAL_INIT_FUNCTION_POINTERS    0x15  /* functions to call
+							  to initialize TLV
+							  values */
+
 /*
  * Constants for the section attributes part of the flags field of a section
  * structure.
@@ -696,9 +751,12 @@ struct prebound_dylib_command {
  * the name of the dynamic linker (LC_LOAD_DYLINKER).  And a dynamic linker
  * contains a dylinker_command to identify the dynamic linker (LC_ID_DYLINKER).
  * A file can have at most one of these.
+ * This struct is also used for the LC_DYLD_ENVIRONMENT load command and
+ * contains string for dyld to treat like environment variable.
  */
 struct dylinker_command {
-	uint32_t	cmd;		/* LC_ID_DYLINKER or LC_LOAD_DYLINKER */
+	uint32_t	cmd;		/* LC_ID_DYLINKER, LC_LOAD_DYLINKER or
+					   LC_DYLD_ENVIRONMENT */
 	uint32_t	cmdsize;	/* includes pathname string */
 	union lc_str    name;		/* dynamic linker's path name */
 };
@@ -1102,26 +1160,240 @@ struct rpath_command {
  * of data in the __LINKEDIT segment.  
  */
 struct linkedit_data_command {
-    uint32_t	cmd;		/* LC_CODE_SIGNATURE or LC_SEGMENT_SPLIT_INFO */
+    uint32_t	cmd;		/* LC_CODE_SIGNATURE, LC_SEGMENT_SPLIT_INFO,
+                                   LC_FUNCTION_STARTS, LC_DATA_IN_CODE,
+				   LC_DYLIB_CODE_SIGN_DRS or
+				   LC_LINKER_OPTIMIZATION_HINT. */
     uint32_t	cmdsize;	/* sizeof(struct linkedit_data_command) */
     uint32_t	dataoff;	/* file offset of data in __LINKEDIT segment */
     uint32_t	datasize;	/* file size of data in __LINKEDIT segment  */
 };
 
-
 /*
  * The encryption_info_command contains the file offset and size of an
- * of an encrypted segment.  
+ * of an encrypted segment.
  */
 struct encryption_info_command {
-	uint32_t	cmd;		/* LC_ENCRYPTION_INFO */
-	uint32_t	cmdsize;	/* sizeof(struct encryption_info_command) */
-	uint32_t	cryptoff;	/* file offset of encrypted range */
-	uint32_t	cryptsize;	/* file size of encrypted range */
-	uint32_t	cryptid;	/* which enryption system, 
-					0 means not-encrypted yet */
+   uint32_t	cmd;		/* LC_ENCRYPTION_INFO */
+   uint32_t	cmdsize;	/* sizeof(struct encryption_info_command) */
+   uint32_t	cryptoff;	/* file offset of encrypted range */
+   uint32_t	cryptsize;	/* file size of encrypted range */
+   uint32_t	cryptid;	/* which enryption system,
+				   0 means not-encrypted yet */
 };
 
+/*
+ * The encryption_info_command_64 contains the file offset and size of an
+ * of an encrypted segment (for use in x86_64 targets).
+ */
+struct encryption_info_command_64 {
+   uint32_t	cmd;		/* LC_ENCRYPTION_INFO_64 */
+   uint32_t	cmdsize;	/* sizeof(struct encryption_info_command_64) */
+   uint32_t	cryptoff;	/* file offset of encrypted range */
+   uint32_t	cryptsize;	/* file size of encrypted range */
+   uint32_t	cryptid;	/* which enryption system,
+				   0 means not-encrypted yet */
+   uint32_t	pad;		/* padding to make this struct's size a multiple
+				   of 8 bytes */
+};
+
+/*
+ * The version_min_command contains the min OS version on which this 
+ * binary was built to run.
+ */
+struct version_min_command {
+    uint32_t	cmd;		/* LC_VERSION_MIN_MACOSX or
+				   LC_VERSION_MIN_IPHONEOS or
+				   LC_VERSION_MIN_WATCHOS or
+				   LC_VERSION_MIN_TVOS */
+    uint32_t	cmdsize;	/* sizeof(struct min_version_command) */
+    uint32_t	version;	/* X.Y.Z is encoded in nibbles xxxx.yy.zz */
+    uint32_t	sdk;		/* X.Y.Z is encoded in nibbles xxxx.yy.zz */
+};
+
+/*
+ * The dyld_info_command contains the file offsets and sizes of 
+ * the new compressed form of the information dyld needs to 
+ * load the image.  This information is used by dyld on Mac OS X
+ * 10.6 and later.  All information pointed to by this command
+ * is encoded using byte streams, so no endian swapping is needed
+ * to interpret it. 
+ */
+struct dyld_info_command {
+   uint32_t   cmd;		/* LC_DYLD_INFO or LC_DYLD_INFO_ONLY */
+   uint32_t   cmdsize;		/* sizeof(struct dyld_info_command) */
+
+    /*
+     * Dyld rebases an image whenever dyld loads it at an address different
+     * from its preferred address.  The rebase information is a stream
+     * of byte sized opcodes whose symbolic names start with REBASE_OPCODE_.
+     * Conceptually the rebase information is a table of tuples:
+     *    <seg-index, seg-offset, type>
+     * The opcodes are a compressed way to encode the table by only
+     * encoding when a column changes.  In addition simple patterns
+     * like "every n'th offset for m times" can be encoded in a few
+     * bytes.
+     */
+    uint32_t   rebase_off;	/* file offset to rebase info  */
+    uint32_t   rebase_size;	/* size of rebase info   */
+    
+    /*
+     * Dyld binds an image during the loading process, if the image
+     * requires any pointers to be initialized to symbols in other images.  
+     * The bind information is a stream of byte sized 
+     * opcodes whose symbolic names start with BIND_OPCODE_.
+     * Conceptually the bind information is a table of tuples:
+     *    <seg-index, seg-offset, type, symbol-library-ordinal, symbol-name, addend>
+     * The opcodes are a compressed way to encode the table by only
+     * encoding when a column changes.  In addition simple patterns
+     * like for runs of pointers initialzed to the same value can be 
+     * encoded in a few bytes.
+     */
+    uint32_t   bind_off;	/* file offset to binding info   */
+    uint32_t   bind_size;	/* size of binding info  */
+        
+    /*
+     * Some C++ programs require dyld to unique symbols so that all
+     * images in the process use the same copy of some code/data.
+     * This step is done after binding. The content of the weak_bind
+     * info is an opcode stream like the bind_info.  But it is sorted
+     * alphabetically by symbol name.  This enable dyld to walk 
+     * all images with weak binding information in order and look
+     * for collisions.  If there are no collisions, dyld does
+     * no updating.  That means that some fixups are also encoded
+     * in the bind_info.  For instance, all calls to "operator new"
+     * are first bound to libstdc++.dylib using the information
+     * in bind_info.  Then if some image overrides operator new
+     * that is detected when the weak_bind information is processed
+     * and the call to operator new is then rebound.
+     */
+    uint32_t   weak_bind_off;	/* file offset to weak binding info   */
+    uint32_t   weak_bind_size;  /* size of weak binding info  */
+    
+    /*
+     * Some uses of external symbols do not need to be bound immediately.
+     * Instead they can be lazily bound on first use.  The lazy_bind
+     * are contains a stream of BIND opcodes to bind all lazy symbols.
+     * Normal use is that dyld ignores the lazy_bind section when
+     * loading an image.  Instead the static linker arranged for the
+     * lazy pointer to initially point to a helper function which 
+     * pushes the offset into the lazy_bind area for the symbol
+     * needing to be bound, then jumps to dyld which simply adds
+     * the offset to lazy_bind_off to get the information on what 
+     * to bind.  
+     */
+    uint32_t   lazy_bind_off;	/* file offset to lazy binding info */
+    uint32_t   lazy_bind_size;  /* size of lazy binding infs */
+    
+    /*
+     * The symbols exported by a dylib are encoded in a trie.  This
+     * is a compact representation that factors out common prefixes.
+     * It also reduces LINKEDIT pages in RAM because it encodes all  
+     * information (name, address, flags) in one small, contiguous range.
+     * The export area is a stream of nodes.  The first node sequentially
+     * is the start node for the trie.  
+     *
+     * Nodes for a symbol start with a uleb128 that is the length of
+     * the exported symbol information for the string so far.
+     * If there is no exported symbol, the node starts with a zero byte. 
+     * If there is exported info, it follows the length.  
+	 *
+	 * First is a uleb128 containing flags. Normally, it is followed by
+     * a uleb128 encoded offset which is location of the content named
+     * by the symbol from the mach_header for the image.  If the flags
+     * is EXPORT_SYMBOL_FLAGS_REEXPORT, then following the flags is
+     * a uleb128 encoded library ordinal, then a zero terminated
+     * UTF8 string.  If the string is zero length, then the symbol
+     * is re-export from the specified dylib with the same name.
+	 * If the flags is EXPORT_SYMBOL_FLAGS_STUB_AND_RESOLVER, then following
+	 * the flags is two uleb128s: the stub offset and the resolver offset.
+	 * The stub is used by non-lazy pointers.  The resolver is used
+	 * by lazy pointers and must be called to get the actual address to use.
+     *
+     * After the optional exported symbol information is a byte of
+     * how many edges (0-255) that this node has leaving it, 
+     * followed by each edge.
+     * Each edge is a zero terminated UTF8 of the addition chars
+     * in the symbol, followed by a uleb128 offset for the node that
+     * edge points to.
+     *  
+     */
+    uint32_t   export_off;	/* file offset to lazy binding info */
+    uint32_t   export_size;	/* size of lazy binding infs */
+};
+
+/*
+ * The following are used to encode rebasing information
+ */
+#define REBASE_TYPE_POINTER					1
+#define REBASE_TYPE_TEXT_ABSOLUTE32				2
+#define REBASE_TYPE_TEXT_PCREL32				3
+
+#define REBASE_OPCODE_MASK					0xF0
+#define REBASE_IMMEDIATE_MASK					0x0F
+#define REBASE_OPCODE_DONE					0x00
+#define REBASE_OPCODE_SET_TYPE_IMM				0x10
+#define REBASE_OPCODE_SET_SEGMENT_AND_OFFSET_ULEB		0x20
+#define REBASE_OPCODE_ADD_ADDR_ULEB				0x30
+#define REBASE_OPCODE_ADD_ADDR_IMM_SCALED			0x40
+#define REBASE_OPCODE_DO_REBASE_IMM_TIMES			0x50
+#define REBASE_OPCODE_DO_REBASE_ULEB_TIMES			0x60
+#define REBASE_OPCODE_DO_REBASE_ADD_ADDR_ULEB			0x70
+#define REBASE_OPCODE_DO_REBASE_ULEB_TIMES_SKIPPING_ULEB	0x80
+
+
+/*
+ * The following are used to encode binding information
+ */
+#define BIND_TYPE_POINTER					1
+#define BIND_TYPE_TEXT_ABSOLUTE32				2
+#define BIND_TYPE_TEXT_PCREL32					3
+
+#define BIND_SPECIAL_DYLIB_SELF					 0
+#define BIND_SPECIAL_DYLIB_MAIN_EXECUTABLE			-1
+#define BIND_SPECIAL_DYLIB_FLAT_LOOKUP				-2
+
+#define BIND_SYMBOL_FLAGS_WEAK_IMPORT				0x1
+#define BIND_SYMBOL_FLAGS_NON_WEAK_DEFINITION			0x8
+
+#define BIND_OPCODE_MASK					0xF0
+#define BIND_IMMEDIATE_MASK					0x0F
+#define BIND_OPCODE_DONE					0x00
+#define BIND_OPCODE_SET_DYLIB_ORDINAL_IMM			0x10
+#define BIND_OPCODE_SET_DYLIB_ORDINAL_ULEB			0x20
+#define BIND_OPCODE_SET_DYLIB_SPECIAL_IMM			0x30
+#define BIND_OPCODE_SET_SYMBOL_TRAILING_FLAGS_IMM		0x40
+#define BIND_OPCODE_SET_TYPE_IMM				0x50
+#define BIND_OPCODE_SET_ADDEND_SLEB				0x60
+#define BIND_OPCODE_SET_SEGMENT_AND_OFFSET_ULEB			0x70
+#define BIND_OPCODE_ADD_ADDR_ULEB				0x80
+#define BIND_OPCODE_DO_BIND					0x90
+#define BIND_OPCODE_DO_BIND_ADD_ADDR_ULEB			0xA0
+#define BIND_OPCODE_DO_BIND_ADD_ADDR_IMM_SCALED			0xB0
+#define BIND_OPCODE_DO_BIND_ULEB_TIMES_SKIPPING_ULEB		0xC0
+
+
+/*
+ * The following are used on the flags byte of a terminal node
+ * in the export information.
+ */
+#define EXPORT_SYMBOL_FLAGS_KIND_MASK				0x03
+#define EXPORT_SYMBOL_FLAGS_KIND_REGULAR			0x00
+#define EXPORT_SYMBOL_FLAGS_KIND_THREAD_LOCAL			0x01
+#define EXPORT_SYMBOL_FLAGS_WEAK_DEFINITION			0x04
+#define EXPORT_SYMBOL_FLAGS_REEXPORT				0x08
+#define EXPORT_SYMBOL_FLAGS_STUB_AND_RESOLVER			0x10
+
+/*
+ * The linker_option_command contains linker options embedded in object files.
+ */
+struct linker_option_command {
+    uint32_t  cmd;	/* LC_LINKER_OPTION only used in MH_OBJECT filetypes */
+    uint32_t  cmdsize;
+    uint32_t  count;	/* number of strings */
+    /* concatenation of zero terminated UTF8 strings.
+       Zero filled at end to align */
+};
 
 /*
  * The symseg_command contains the offset and size of the GNU style
@@ -1161,6 +1433,61 @@ struct fvmfile_command {
 	uint32_t cmdsize;		/* includes pathname string */
 	union lc_str	name;		/* files pathname */
 	uint32_t	header_addr;	/* files virtual address */
+};
+
+
+/*
+ * The entry_point_command is a replacement for thread_command.
+ * It is used for main executables to specify the location (file offset)
+ * of main().  If -stack_size was used at link time, the stacksize
+ * field will contain the stack size need for the main thread.
+ */
+struct entry_point_command {
+    uint32_t  cmd;	/* LC_MAIN only used in MH_EXECUTE filetypes */
+    uint32_t  cmdsize;	/* 24 */
+    uint64_t  entryoff;	/* file (__TEXT) offset of main() */
+    uint64_t  stacksize;/* if not zero, initial stack size */
+};
+
+
+/*
+ * The source_version_command is an optional load command containing
+ * the version of the sources used to build the binary.
+ */
+struct source_version_command {
+    uint32_t  cmd;	/* LC_SOURCE_VERSION */
+    uint32_t  cmdsize;	/* 16 */
+    uint64_t  version;	/* A.B.C.D.E packed as a24.b10.c10.d10.e10 */
+};
+
+
+/*
+ * The LC_DATA_IN_CODE load commands uses a linkedit_data_command 
+ * to point to an array of data_in_code_entry entries. Each entry
+ * describes a range of data in a code section.
+ */
+struct data_in_code_entry {
+    uint32_t	offset;  /* from mach_header to start of data range*/
+    uint16_t	length;  /* number of bytes in data range */
+    uint16_t	kind;    /* a DICE_KIND_* value  */
+};
+#define DICE_KIND_DATA              0x0001
+#define DICE_KIND_JUMP_TABLE8       0x0002
+#define DICE_KIND_JUMP_TABLE16      0x0003
+#define DICE_KIND_JUMP_TABLE32      0x0004
+#define DICE_KIND_ABS_JUMP_TABLE32  0x0005
+
+
+
+/*
+ * Sections of type S_THREAD_LOCAL_VARIABLES contain an array 
+ * of tlv_descriptor structures.
+ */
+struct tlv_descriptor
+{
+	void*		(*thunk)(struct tlv_descriptor*);
+	unsigned long	key;
+	unsigned long	offset;
 };
 
 #endif /* _MACHO_LOADER_H_ */

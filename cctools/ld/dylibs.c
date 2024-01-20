@@ -42,30 +42,30 @@
 #include "pass1.h"
 #include "sections.h"
 
-enum bool has_dynamic_linker_command = FALSE;
+__private_extern__ enum bool has_dynamic_linker_command = FALSE;
 
 #ifndef RLD
 
 /* the pointer to the head of the dynamicly linked shared library commands */
-struct merged_dylib *merged_dylibs = NULL;
+__private_extern__ struct merged_dylib *merged_dylibs = NULL;
 
 /* the pointer to the merged the dynamic linker command if any */
-struct merged_dylinker *merged_dylinker = NULL;
+__private_extern__ struct merged_dylinker *merged_dylinker = NULL;
 
 /* the pointer to the merged sub_framework command if any */
-struct merged_sub_frameworks *merged_sub_framework = NULL;
+__private_extern__ struct merged_sub_frameworks *merged_sub_framework = NULL;
 
 /* the pointer to the head of the dynamicly linked shared library segments */
-struct merged_segment *dylib_segments = NULL;
+__private_extern__ struct merged_segment *dylib_segments = NULL;
 
 /* the pointer to the merged sub_umbrella commands if any */
-struct merged_sub_umbrella *merged_sub_umbrellas = NULL;
+__private_extern__ struct merged_sub_umbrella *merged_sub_umbrellas = NULL;
 
 /* the pointer to the merged sub_library commands if any */
-struct merged_sub_library *merged_sub_librarys = NULL;
+__private_extern__ struct merged_sub_library *merged_sub_librarys = NULL;
 
 /* the pointer to the merged sub_client commands if any */
-struct merged_sub_client *merged_sub_clients = NULL;
+__private_extern__ struct merged_sub_client *merged_sub_clients = NULL;
 
 static struct merged_dylib *lookup_merged_dylib(
     struct dylib_command *dl);
@@ -75,7 +75,7 @@ static struct merged_dylib *lookup_merged_dylib(
  * command line argument values.  It is called from layout() when the output
  * filetype is MH_DYLIB.
  */
-extern
+__private_extern__
 void
 create_dylib_id_command(
 void)
@@ -91,7 +91,7 @@ void)
 	    name = outputfile;
 
 	cmdsize = sizeof(struct dylib_command) +
-		  round(strlen(name) + 1, sizeof(long));
+		  rnd(strlen(name) + 1, sizeof(long));
 	dl = allocate(cmdsize);
 	memset(dl, '\0', cmdsize);
 	dl->cmd = LC_ID_DYLIB;
@@ -114,7 +114,7 @@ void)
 /*
  * merge_dylibs() merges in the dylib commands from the current object.
  */
-extern
+__private_extern__
 void
 merge_dylibs(
 enum bool force_weak)
@@ -255,7 +255,7 @@ struct dylib_command *dl)
  * command line argument values.  It is called from layout() when the output
  * filetype is MH_DYLINKER.
  */
-extern
+__private_extern__
 void
 create_dylinker_id_command(
 void)
@@ -271,7 +271,7 @@ void)
 	    name = outputfile;
 
 	cmdsize = sizeof(struct dylinker_command) +
-		  round(strlen(name) + 1, sizeof(long));
+		  rnd(strlen(name) + 1, sizeof(long));
 	dyld = allocate(cmdsize);
 	memset(dyld, '\0', cmdsize);
 	dyld->cmd = LC_ID_DYLINKER;
@@ -291,7 +291,7 @@ void)
  * the command line argument values.  It is called from layout() when the output
  * filetype is MH_DYLIB and -sub_framework was specified.
  */
-extern
+__private_extern__
 void
 create_sub_framework_command(
 void)
@@ -304,7 +304,7 @@ void)
 	name = umbrella_framework_name;
 
 	cmdsize = sizeof(struct sub_framework_command) +
-		  round(strlen(name) + 1, sizeof(long));
+		  rnd(strlen(name) + 1, sizeof(long));
 	sub = allocate(cmdsize);
 	memset(sub, '\0', cmdsize);
 	sub->cmd = LC_SUB_FRAMEWORK;
@@ -325,7 +325,7 @@ void)
  * filetype is MH_DYLIB and one or more -sub_umbrella flags were specified.
  * It returns the total size of the load commands it creates.
  */
-extern
+__private_extern__
 unsigned long
 create_sub_umbrella_commands(
 void)
@@ -362,7 +362,7 @@ void)
 		      "name is linked in", name);
 
 	    cmdsize = sizeof(struct sub_umbrella_command) +
-		      round(strlen(name) + 1, sizeof(long));
+		      rnd(strlen(name) + 1, sizeof(long));
 	    sub = allocate(cmdsize);
 	    memset(sub, '\0', cmdsize);
 	    sub->cmd = LC_SUB_UMBRELLA;
@@ -382,7 +382,7 @@ void)
  * filetype is MH_DYLIB and one or more -sub_library flags were specified.
  * It returns the total size of the load commands it creates.
  */
-extern
+__private_extern__
 unsigned long
 create_sub_library_commands(
 void)
@@ -419,7 +419,7 @@ void)
 		      "name is linked in", name);
 
 	    cmdsize = sizeof(struct sub_library_command) +
-		      round(strlen(name) + 1, sizeof(long));
+		      rnd(strlen(name) + 1, sizeof(long));
 	    sub = allocate(cmdsize);
 	    memset(sub, '\0', cmdsize);
 	    sub->cmd = LC_SUB_LIBRARY;
@@ -439,7 +439,7 @@ void)
  * filetype is MH_DYLIB and one or more -allowable_client flags were specified.
  * It returns the total size of the load commands it creates.
  */
-extern
+__private_extern__
 unsigned long
 create_sub_client_commands(
 void)
@@ -455,7 +455,7 @@ void)
 	for(i = 0; i < nallowable_clients ; i++){
 	    name = allowable_clients[i];
 	    cmdsize = sizeof(struct sub_client_command) +
-		      round(strlen(name) + 1, sizeof(long));
+		      rnd(strlen(name) + 1, sizeof(long));
 	    sub = allocate(cmdsize);
 	    memset(sub, '\0', cmdsize);
 	    sub->cmd = LC_SUB_CLIENT;
@@ -473,7 +473,7 @@ void)
  * add_dylib_segment() adds the specified segment to the list of
  * dylib_segments as comming from the specified dylib_name.
  */
-extern
+__private_extern__
 void
 add_dylib_segment(
 struct segment_command *sg,

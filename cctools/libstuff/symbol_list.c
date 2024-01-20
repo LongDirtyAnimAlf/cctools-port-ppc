@@ -49,14 +49,14 @@ void
 setup_symbol_list(
 char *file,
 struct symbol_list **list,
-unsigned long *size)
+uint32_t *size)
 {
     int fd;
-    unsigned long i, j, len, strings_size;
+    uint32_t i, j, len, strings_size;
     struct stat stat_buf;
     char *strings, *p, *line;
 
-	if((fd = open(file, O_RDONLY)) < 0){
+	if((fd = open(file, O_RDONLY | O_BINARY)) < 0){
 	    system_error("can't open: %s", file);
 	    return;
 	}

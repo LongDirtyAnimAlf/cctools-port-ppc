@@ -21,19 +21,17 @@
  * @APPLE_LICENSE_HEADER_END@
  */
 #ifndef RLD
-#if !defined(__CYGWIN__)
-#include <stdlib.h> /* first to get rid of pre-comp warning */
+#include <libc.h> /* first to get rid of pre-comp warning */
 #include <mach/mach.h> /* first to get rid of pre-comp warning */
-#endif
 #include "stdio.h"
-#include <unistd.h>
 #include <signal.h>
-#include <err.h>
-#include <errno.h>
 #include <sys/wait.h>
+#include <sys/file.h>
+#include <errno.h>
 #include "stuff/errors.h"
 #include "stuff/allocate.h"
 #include "stuff/execute.h"
+#include "mach-o/dyld.h"
 
 /*
  * execute() does an execvp using the argv passed to it.  If the parameter
@@ -44,9 +42,9 @@ __private_extern__
 int
 execute(
 char **argv,
-long verbose)
+int verbose)
 {
-    char *name, **p, *q;
+    char *name, **p;
     int forkpid, waitpid, termsig;
 #ifndef __OPENSTEP__
     int waitstatus;
@@ -54,15 +52,13 @@ long verbose)
     union wait waitstatus;
 #endif
 
-	name = argv[0];
+    name = argv[0];
 
 	if(verbose){
-	    fprintf(stderr, "++ %s ", name);
+	    fprintf(stderr, "+ %s ", name);
 	    p = &(argv[1]);
-	    while(*p != (char *)0) {
-              while (q = strchr(*p, '\\')) *q = '/';
+	    while(*p != (char *)0)
 		    fprintf(stderr, "%s ", *p++);
-            }
 	    fprintf(stderr, "\n");
 	}
 
@@ -76,7 +72,10 @@ long verbose)
 	    return(1); /* can't get here, removes a warning from the compiler */
 	}
 	else{
-	    waitpid = wait(&waitstatus);
+            waitpid = -1;
+	    do{
+	        waitpid = wait(&waitstatus);
+	    } while (waitpid == -1 && errno == EINTR);
 	    if(waitpid == -1)
 		system_fatal("wait on forked process %d failed", forkpid);
 #ifndef __OPENSTEP__
@@ -131,6 +130,69 @@ char *str)
 }
 
 /*
+ * This routine is passed a string to be added to the list of strings for 
+ * command line arguments and is then prefixed with the path of the executable.
+ */
+__private_extern__
+void
+add_execute_list_with_prefix(
+char *str)
+{
+	add_execute_list(cmd_with_prefix(str));
+}
+
+/*
+ * This routine is passed a string of a command name and a string is returned
+ * prefixed with the path of the executable and that command name.
+ */
+__private_extern__
+char *
+cmd_with_prefix(
+char *str)
+{
+	int i;
+	char *p;
+	char *prefix, buf[MAXPATHLEN], resolved_name[PATH_MAX];
+	uint32_t bufsize;
+
+	/*
+	 * Construct the prefix to the program running.
+	 */
+	bufsize = MAXPATHLEN;
+	p = buf;
+	i = _NSGetExecutablePath(p, &bufsize);
+	if(i == -1){
+	    p = allocate(bufsize);
+	    _NSGetExecutablePath(p, &bufsize);
+	}
+	/* cctools-port start */
+#if 0 /* old code */
+	prefix = realpath(p, resolved_name);
+	p = rindex(prefix, '/');
+	if(p != NULL)
+	    p[1] = '\0';
+
+	return(makestr(prefix, str, NULL));
+#endif
+	if (*p){
+		prefix = realpath(p, resolved_name);
+		if (prefix){
+			p = rindex(prefix, '/');
+			if(p != NULL)
+				p[1] = '\0';
+		} else{
+			goto invalid;
+		}
+	} else{
+		invalid:;
+		prefix = "";
+	}
+	/* here we add the target alias to the command string */
+	return(makestr(prefix, PROGRAM_PREFIX, str, NULL));
+	/* cctools-port end */
+}
+
+/*
  * This routine reset the list of strings of command line arguments so that
  * an new command line argument list can be built.
  */
@@ -148,7 +210,7 @@ reset_execute_list(void)
 __private_extern__
 int
 execute_list(
-long verbose)
+int verbose)
 {
 	return(execute(runlist.strings, verbose));
 }

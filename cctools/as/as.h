@@ -20,6 +20,13 @@ the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
 #ifndef AS_H_
 #define AS_H_
 
+extern char *apple_flags;
+#define APPLE_INC_VERSION "Apple Inc version"
+/* apple_version is in apple_version.c which is created by the Makefile */
+extern char apple_version[];
+/* the GNU version is set in as.c */
+extern char version_string[];
+
 #define _(String) (String)
 #define ARRAY_SIZE(a) (sizeof (a) / sizeof ((a)[0]))
 
@@ -53,6 +60,7 @@ the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
 #include <stdint.h>
 #import <stdio.h>
 #import <assert.h>
+#include "ansidecl.h"
 #import <mach/machine.h>
 
 /* These defines are potentially useful */
@@ -132,8 +140,25 @@ typedef enum {
 /* FROM line 285 */
 typedef int subsegT;
 
-/* What subseg we are accessing now?  */
-extern subsegT now_subseg;
+/* Type of debugging information we should generate.  We currently support
+   stabs, ECOFF, and DWARF2.
+
+   NOTE!  This means debug information about the assembly source code itself
+   and _not_ about possible debug information from a high-level language.
+   This is especially relevant to DWARF2, since the compiler may emit line
+   number directives that the assembler resolves.  */
+
+enum debug_info_type
+{
+  DEBUG_UNSPECIFIED,
+  DEBUG_NONE,
+  DEBUG_STABS,
+  DEBUG_ECOFF,
+  DEBUG_DWARF,
+  DEBUG_DWARF2
+};
+
+extern enum debug_info_type debug_type;
 
 /*
  * main program "as.c" (command arguments etc)
@@ -155,7 +180,7 @@ extern cpu_subtype_t archflag_cpusubtype;
 extern char *specific_archflag;
 
 /* TRUE if the .subsections_via_symbols directive was seen */
-int subsections_via_symbols;
+extern int subsections_via_symbols;
 
 /* -I path options for .includes */
 struct directory_stack {

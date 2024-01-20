@@ -28,13 +28,16 @@
 #include "stuff/breakout.h"
 #include "stuff/allocate.h"
 #include "stuff/errors.h"
-#include "stuff/round.h"
+#include "stuff/rnd.h"
 #include "stuff/crc32.h"
+#ifdef LTO_SUPPORT
+#include "stuff/lto.h"
+#endif /* LTO_SUPPORT */
 
 static void breakout_internal(
     char *filename,
     struct arch **archs,
-    unsigned long *narchs,
+    uint32_t *narchs,
     enum bool calculate_input_prebind_cksum,
     struct ofile *ofile);
 static void breakout_loop_through_archive(
@@ -46,7 +49,7 @@ static void cksum_object(
     enum bool calculate_input_prebind_cksum);
 static struct arch *new_arch(
     struct arch **archs,
-    unsigned long *narchs);
+    uint32_t *narchs);
 static struct member *new_member(
     struct arch *arch);
 
@@ -54,14 +57,14 @@ __private_extern__
 struct ofile *
 breakout_mem(
 void *membuf,
-unsigned long length,
+uint32_t length,
 char *filename,
 struct arch **archs,
-unsigned long *narchs,
+uint32_t *narchs,
 enum bool calculate_input_prebind_cksum)
 {
     struct ofile *ofile;
-    unsigned long previous_errors;
+    uint32_t previous_errors;
 
 	*archs = NULL;
 	*narchs = 0;
@@ -78,7 +81,7 @@ enum bool calculate_input_prebind_cksum)
 	 * Rely on the ofile_*() routines to do all the checking and only
 	 * return valid ofiles files broken out.
 	 */
-	if(ofile_map_from_memory((char *)membuf, length, filename, NULL, NULL,
+	if(ofile_map_from_memory((char *)membuf, length, filename, 0,NULL, NULL,
 				 ofile, FALSE) == FALSE){
 	    free(ofile);
 	    return(NULL);
@@ -100,11 +103,11 @@ struct ofile *
 breakout(
 char *filename,
 struct arch **archs,
-unsigned long *narchs,
+uint32_t *narchs,
 enum bool calculate_input_prebind_cksum)
 {
     struct ofile *ofile;
-    unsigned long previous_errors;
+    uint32_t previous_errors;
 	
 	*archs = NULL;
 	*narchs = 0;
@@ -134,7 +137,7 @@ void
 breakout_internal(
 char *filename,
 struct arch **archs,
-unsigned long *narchs,
+uint32_t *narchs,
 enum bool calculate_input_prebind_cksum,
 struct ofile *ofile)
 {
@@ -150,7 +153,14 @@ struct ofile *ofile)
 		arch = new_arch(archs, narchs);
 		arch->file_name = savestr(filename);
 		arch->type = ofile->arch_type;
-		arch->fat_arch = ofile->fat_archs + ofile->narch;
+		if(ofile->fat_header->magic == FAT_MAGIC_64){
+		    arch->fat_arch64 = ofile->fat_archs64 + ofile->narch;
+		    arch->fat_arch = NULL;
+		}
+		else{
+		    arch->fat_arch = ofile->fat_archs + ofile->narch;
+		    arch->fat_arch64 = NULL;
+		}
 		arch->fat_arch_name = savestr(ofile->arch_flag.name);
 
 		if(ofile->arch_type == OFILE_ARCHIVE){
@@ -170,10 +180,32 @@ struct ofile *ofile)
 		    arch->object->load_commands = ofile->load_commands;
 		    cksum_object(arch, calculate_input_prebind_cksum);
 		}
+#ifdef LTO_SUPPORT
+		else if(ofile->arch_type == OFILE_LLVM_BITCODE){
+		    arch->lto = ofile->lto;
+		    if(ofile->fat_header->magic == FAT_MAGIC_64){
+			arch->unknown_addr = ofile->file_addr +
+					     arch->fat_arch64->offset;
+			arch->unknown_size = arch->fat_arch64->size;
+		    }
+		    else{
+			arch->unknown_addr = ofile->file_addr +
+					     arch->fat_arch->offset;
+			arch->unknown_size = arch->fat_arch->size;
+		    }
+		}
+#endif /* LTO_SUPPORT */
 		else{ /* ofile->arch_type == OFILE_UNKNOWN */
-		    arch->unknown_addr = ofile->file_addr +
-					 arch->fat_arch->offset;
-		    arch->unknown_size = arch->fat_arch->size;
+		    if(ofile->fat_header->magic == FAT_MAGIC_64){
+			arch->unknown_addr = ofile->file_addr +
+					     arch->fat_arch64->offset;
+			arch->unknown_size = arch->fat_arch64->size;
+		    }
+		    else{
+			arch->unknown_addr = ofile->file_addr +
+					     arch->fat_arch->offset;
+			arch->unknown_size = arch->fat_arch->size;
+		    }
 		}
 	    }while(ofile_next_arch(ofile) == TRUE);
 	}
@@ -201,6 +233,16 @@ struct ofile *ofile)
 	    arch->object->load_commands = ofile->load_commands;
 	    cksum_object(arch, calculate_input_prebind_cksum);
 	}
+#ifdef LTO_SUPPORT
+	else if(ofile->file_type == OFILE_LLVM_BITCODE && errors == 0){
+	    arch = new_arch(archs, narchs);
+	    arch->file_name = savestr(filename);
+	    arch->type = ofile->file_type;
+	    arch->lto = ofile->lto;
+	    arch->unknown_addr = ofile->file_addr;
+	    arch->unknown_size = ofile->file_size;
+	}
+#endif /* LTO_SUPPORT */
 	else if(errors == 0){ /* ofile->file_type == OFILE_UNKNOWN */
 	    arch = new_arch(archs, narchs);
 	    arch->file_name = savestr(filename);
@@ -225,7 +267,7 @@ struct ofile *ofile)
     struct member *member;
     enum bool flag;
     struct ar_hdr *ar_hdr;
-    unsigned long size, ar_name_size;
+    uint32_t size, ar_name_size;
     char ar_name_buf[sizeof(ofile->member_ar_hdr->ar_name) + 1];
     char ar_size_buf[sizeof(ofile->member_ar_hdr->ar_size) + 1];
 
@@ -263,9 +305,9 @@ struct ofile *ofile)
 		 * bytes will be set to the character '\n'.
 		 */
 		if(ofile->mh != NULL || ofile->mh64 != NULL)
-		    size = round(ofile->object_size, 8);
+		    size = rnd(ofile->object_size, 8);
 		else
-		    size = round(ofile->member_size, 8);
+		    size = rnd(ofile->member_size, 8);
 		/*
 		 * We will force the use of long names so we can make sure the
 		 * size of the name and the size of struct ar_hdr are rounded to
@@ -281,8 +323,8 @@ struct ofile *ofile)
 		       break;
 		}
 		member->member_name_size = ar_name_size;
-		ar_name_size = round(ar_name_size, 8) +
-			       (round(sizeof(struct ar_hdr), 8) -
+		ar_name_size = rnd(ar_name_size, 8) +
+			       (rnd(sizeof(struct ar_hdr), 8) -
 				sizeof(struct ar_hdr));
 		size += ar_name_size;
 		/*
@@ -301,12 +343,12 @@ struct ofile *ofile)
 		ar_hdr = allocate(sizeof(struct ar_hdr));
 		*ar_hdr = *(ofile->member_ar_hdr);
 		sprintf(ar_name_buf, "%s%-*lu", AR_EFMT1, 
-			(int)(sizeof(ar_hdr->ar_name) -
-			      (sizeof(AR_EFMT1) - 1)), ar_name_size);
+			(int)(sizeof(ar_hdr->ar_name) - (sizeof(AR_EFMT1) - 1)),
+		        (long unsigned int)ar_name_size);
 		memcpy(ar_hdr->ar_name, ar_name_buf,
 		      sizeof(ar_hdr->ar_name));
 		sprintf(ar_size_buf, "%-*ld",
-			(int)sizeof(ar_hdr->ar_size), size);
+			(int)sizeof(ar_hdr->ar_size), (long unsigned int)size);
 		memcpy(ar_hdr->ar_size, ar_size_buf,
 		      sizeof(ar_hdr->ar_size));
 
@@ -327,6 +369,13 @@ struct ofile *ofile)
 		    member->object->mh_cpusubtype = ofile->mh_cpusubtype;
 		    member->object->load_commands = ofile->load_commands;
 		}
+#ifdef LTO_SUPPORT
+		else if(ofile->member_type == OFILE_LLVM_BITCODE){
+		    member->lto = ofile->lto;
+		    member->unknown_addr = ofile->member_addr;
+		    member->unknown_size = ofile->member_size;
+		}
+#endif /* LTO_SUPPORT */
 		else{ /* ofile->member_type == OFILE_UNKNOWN */
 		    member->unknown_addr = ofile->member_addr;
 		    member->unknown_size = ofile->member_size;
@@ -354,7 +403,7 @@ cksum_object(
 struct arch *arch,
 enum bool calculate_input_prebind_cksum)
 {
-    unsigned long i, buf_size, ncmds;
+    uint32_t i, buf_size, ncmds;
     struct load_command *lc;
     enum byte_sex host_byte_sex;
     char *buf;
@@ -424,22 +473,39 @@ __private_extern__
 void
 free_archs(
 struct arch *archs,
-unsigned long narchs)
+uint32_t narchs)
 {
-    unsigned long i, j;
+    uint32_t i, j;
 
 	for(i = 0; i < narchs; i++){
 	    if(archs[i].type == OFILE_ARCHIVE){
 		for(j = 0; j < archs[i].nmembers; j++){
-		    if(archs[i].members[j].type == OFILE_Mach_O)
+		    if(archs[i].members[j].type == OFILE_Mach_O){
+			if(archs[i].members[j].object->ld_r_ofile != NULL)
+			   ofile_unmap(archs[i].members[j].object->ld_r_ofile);
 			free(archs[i].members[j].object);
+		    }
+#ifdef LTO_SUPPORT
+		    else if(archs[i].members[j].type == OFILE_LLVM_BITCODE){
+			if(archs[i].members[j].lto != NULL)
+			    lto_free(archs[i].members[j].lto);
+		    }
+#endif /* LTO_SUPPORT */
 		}
 		if(archs[i].nmembers > 0 && archs[i].members != NULL)
 		    free(archs[i].members);
 	    }
 	    else if(archs[i].type == OFILE_Mach_O){
+		if(archs[i].object->ld_r_ofile != NULL)
+		    ofile_unmap(archs[i].object->ld_r_ofile);
 		free(archs[i].object);
 	    }
+#ifdef LTO_SUPPORT
+	    else if(archs[i].type == OFILE_LLVM_BITCODE){
+		if(archs[i].lto != NULL)
+		    lto_free(archs[i].lto);
+	    }
+#endif /* LTO_SUPPORT */
 	}
 	if(narchs > 0 && archs != NULL)
 	    free(archs);
@@ -449,7 +515,7 @@ static
 struct arch *
 new_arch(
 struct arch **archs,
-unsigned long *narchs)
+uint32_t *narchs)
 {
     struct arch *arch;
 

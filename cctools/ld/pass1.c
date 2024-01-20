@@ -35,7 +35,6 @@
 #include <sys/file.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include "stuff/openstep_mach.h"
 #include <mach-o/fat.h>
 #include <mach-o/loader.h>
@@ -43,8 +42,7 @@
 #include <mach-o/reloc.h>
 #include <mach-o/ldsyms.h>
 #if !(defined(KLD) && defined(__STATIC__))
-#include <stdlib.h>
-#include <sys/param.h>
+#include <libc.h>
 #include <stdio.h>
 #include <mach/mach.h>
 #include <errno.h>
@@ -80,22 +78,22 @@
 
 #ifndef RLD
 /* TRUE if -search_paths_first was specified */
-extern enum bool search_paths_first = FALSE;
+__private_extern__ enum bool search_paths_first = FALSE;
 
 /* the user specified directories to search for -lx names, and the number
    of them */
-extern char **search_dirs = NULL;
-extern unsigned long nsearch_dirs = 0;
+__private_extern__ char **search_dirs = NULL;
+__private_extern__ unsigned long nsearch_dirs = 0;
 
 /*
  * The user specified directories to search via the environment variable
  * LD_LIBRARY_PATH.
  */
-extern char **ld_library_paths = NULL;
-extern unsigned long nld_library_paths = 0;
+__private_extern__ char **ld_library_paths = NULL;
+__private_extern__ unsigned long nld_library_paths = 0;
 
 /* the standard directories to search for -lx names */
-extern char *standard_dirs[] = {
+__private_extern__ char *standard_dirs[] = {
     "/lib/",
     "/usr/lib/",
     "/usr/local/lib/",
@@ -106,11 +104,11 @@ extern char *standard_dirs[] = {
  * The user specified directories to search for "-framework Foo" names, and the
  * number of them.  These are specified with -F options.
  */
-extern char **framework_dirs = NULL;
-extern unsigned long nframework_dirs = 0;
+__private_extern__ char **framework_dirs = NULL;
+__private_extern__ unsigned long nframework_dirs = 0;
 
 /* the standard framework directories to search for "-framework Foo" names */
-extern char *standard_framework_dirs[] = {
+__private_extern__ char *standard_framework_dirs[] = {
 #ifdef __OPENSTEP__
     "/LocalLibrary/Frameworks/",
     "/NextLibrary/Frameworks/",
@@ -129,14 +127,7 @@ extern char *standard_framework_dirs[] = {
 };
 
 /* The pointer to the head of the base object file's segments */
-extern struct merged_segment *base_obj_segments = NULL;
-
-extern char *search_lib_extensions[] = {
-    ".dylib",
-    ".a",
-    NULL
-};
-
+__private_extern__ struct merged_segment *base_obj_segments = NULL;
 #endif /* !defined(RLD) */
 
 #if !defined(SA_RLD) && !(defined(KLD) && defined(__STATIC__))
@@ -154,16 +145,16 @@ static struct stat stat_buf = { 0 };
  * ran_name so that the library can be mapped read only and thus not get dirty
  * and maybe written to the swap area by the kernel.
  */
-extern char *bsearch_strings = NULL;
+__private_extern__ char *bsearch_strings = NULL;
 #ifndef RLD
-extern struct nlist *bsearch_symbols = NULL;
+__private_extern__ struct nlist *bsearch_symbols = NULL;
 
 /*
  * The list of dynamic libraries to search.  The list of specified libraries
  * can contain archive libraries when archive libraries appear after dynamic
  * libraries on the link line.
  */
-extern struct dynamic_library *dynamic_libs = NULL;
+__private_extern__ struct dynamic_library *dynamic_libs = NULL;
 
 /*
  * When building two-level-namespace, indirect libraries are not kept
@@ -173,7 +164,7 @@ extern struct dynamic_library *dynamic_libs = NULL;
  * gives us a scaling factor to multiple by the number of libraries
  * in dynamic_libs as an estimate of the total number of libraries.
  */
-extern unsigned int indirect_library_ratio = 1;
+__private_extern__ unsigned int indirect_library_ratio = 1;
 
 /*
  * The variable indirect_dylib is used for search_dynamic_libs() to communicate
@@ -317,20 +308,6 @@ static char *mkstr(
 	...);
 #endif /* !defined(RLD) */
 
-static void strip(char *s)
-{
-    char *p = s;
-    int n;
-    while (*s)
-    {
-        n = strcspn(s, "\r\n");
-        strncpy(p, s, n);
-        p += n;
-        s += n + strspn(s+n, "\r\n");
-    }
-    *p = 0;
-}
-
 #if !defined(SA_RLD) && !(defined(KLD) && defined(__STATIC__))
 /*
  * pass1() is called from main() and is passed the name of a file and a flag
@@ -353,7 +330,7 @@ static void strip(char *s)
  * references or the -ObjC flag is set and their are symbols with the ".objc"
  * prefix defined.
  */
-extern
+__private_extern__
 void
 pass1(
 char *name,
@@ -367,7 +344,6 @@ enum bool force_weak)
     char *file_name;
 #ifndef RLD
     char *p, *type;
-    int search_lib_index = 0;
 #endif /* !defined(RLD) */
     kern_return_t r;
     unsigned long file_size;
@@ -385,7 +361,7 @@ enum bool force_weak)
 	/* this function" can safely be ignored */
 	file_name = NULL;
 #endif /* DEBUG */
-        strip(name);
+
 	fd = -1;
 #ifndef RLD
 	if(lname){
@@ -407,10 +383,11 @@ enum bool force_weak)
 			search_paths_for_lname(&name[2], &file_name, &fd);
 		    }
 		    else{
-			while (search_lib_extensions[search_lib_index] && (fd == -1)) {
-			    p = mkstr("lib", &name[2], search_lib_extensions[search_lib_index], NULL);
+			p = mkstr("lib", &name[2], ".dylib", NULL);
+			search_for_file(p, &file_name, &fd);
+			if(fd == -1){
+			    p = mkstr("lib", &name[2], ".a", NULL);
 			    search_for_file(p, &file_name, &fd);
-			    search_lib_index++;
 			}
 		    }
 		}
@@ -531,7 +508,7 @@ enum bool force_weak)
 	    pass1_object(file_name, file_addr, file_size, base_name, FALSE,
 			 FALSE, bundle_loader, force_weak);
 	}
-#if defined(VM_SYNC_DEACTIVATE) && !defined(_POSIX_C_SOURCE) && !defined(__CYGWIN__)
+#ifdef VM_SYNC_DEACTIVATE
 	vm_msync(mach_task_self(), (vm_address_t)file_addr,
 		 (vm_size_t)file_size, VM_SYNC_DEACTIVATE);
 #endif /* VM_SYNC_DEACTIVATE */
@@ -552,7 +529,7 @@ char **file_name,
 int *fd)
 {
     unsigned long i;
-        strip(base_name);
+
 	*fd = -1;
 	for(i = 0; i < nsearch_dirs ; i++){
 	    *file_name = mkstr(search_dirs[i], "/", base_name, NULL);
@@ -592,7 +569,7 @@ char **file_name,
 int *fd)
 {
     unsigned long i;
-        strip(name);
+
 	*fd = -1;
 	for(i = 0; i < nframework_dirs ; i++){
 	    *file_name = mkstr(framework_dirs[i], "/", name, NULL);
@@ -664,26 +641,17 @@ const char *lname_argument,
 char **file_name,
 int *fd)
 {
-	int search_lib_index=0;
-	*fd = -1;
-	while (search_lib_extensions[search_lib_index] && (*fd == -1)) {
-	    *file_name = mkstr(dir, "/", "lib", lname_argument, search_lib_extensions[search_lib_index], NULL);
-	    if((*fd = open(*file_name, O_RDONLY)) != -1)
-		break;
-	search_lib_index++;
-	}
-	if (*fd == -1)
-	    free(*file_name);
+	*file_name = mkstr(dir, "/", "lib", lname_argument, ".dylib", NULL);
+	if((*fd = open(*file_name, O_RDONLY)) != -1)
+	    return;
+	free(*file_name);
+
+	*file_name = mkstr(dir, "/", "lib", lname_argument, ".a", NULL);
+	if((*fd = open(*file_name, O_RDONLY)) != -1)
+	    return;
+	free(*file_name);
 }
 #endif /* !defined(RLD) */
-
-#ifndef RLD
-/*
- * This is used in this file if we have told PB that there is an "Architecture
- * mismatch".
- */
-static enum bool told_ProjectBuilder = FALSE;
-#endif
 
 /*
  * pass1_fat() is passed a fat file to process.  The reason the swapping of
@@ -770,12 +738,6 @@ enum bool force_weak)
 			error("fat file: %s does not contain an architecture "
 			      "that matches the specified -arch flag: %s ",
 			      file_name, arch_flag.name);
-#ifndef RLD
-			if(told_ProjectBuilder == FALSE){
-			    tell_ProjectBuilder("Architecture mismatch");
-			    told_ProjectBuilder = TRUE;
-			}
-#endif
 		    }
 		    else
 			warning("fat file: %s does not contain an architecture "
@@ -789,12 +751,6 @@ enum bool force_weak)
 			error("fat file: %s does not contain an architecture "
 			    "that matches the objects files (architecture %s) "
 			    "previously loaded", file_name, prev_arch);
-#ifndef RLD
-			if(told_ProjectBuilder == FALSE){
-			    tell_ProjectBuilder("Architecture mismatch");
-			    told_ProjectBuilder = TRUE;
-			}
-#endif
 		    }
 		    else
 			warning("fat file: %s does not contain an architecture "
@@ -907,7 +863,7 @@ pass1_fat_return:
 	return;
 }
 
-extern
+__private_extern__
 void
 check_fat(
 char *file_name,
@@ -1102,7 +1058,7 @@ enum bool force_weak)
 			  "load from it)", file_name);
 		    return;
 		}
-		offset += round(symdef_length, sizeof(short));
+		offset += rnd(symdef_length, sizeof(short));
 	    }
 	    if(ld_trace_archives == TRUE && ld_trace_archive_printed == FALSE){
 		char resolvedname[MAXPATHLEN];
@@ -1205,13 +1161,6 @@ enum bool force_weak)
 					"an architecture that matches the "
 					"specified -arch flag: %s", file_name,
 					(int)i, ar_name, arch_flag.name);
-#ifndef RLD
-				    if(told_ProjectBuilder == FALSE){
-					tell_ProjectBuilder("Architecture "
-					    "mismatch");
-					told_ProjectBuilder = TRUE;
-				    }
-#endif
 				}
 				else
 				    warning("fat file: %s(%.*s) does not "
@@ -1229,13 +1178,6 @@ enum bool force_weak)
 					"objects files (architecture %s) "
 					"previously loaded", file_name,
 					(int)i, ar_name, prev_arch);
-#ifndef RLD
-				    if(told_ProjectBuilder == FALSE){
-					tell_ProjectBuilder("Architecture "
-					    "mismatch");
-					told_ProjectBuilder = TRUE;
-				    }
-#endif
 				}
 				else
 				    warning("fat file: %s(%.*s) does not "
@@ -1313,7 +1255,7 @@ down:
 		    print("loaded because of -all_load flag\n");
 		}
 		merge(FALSE, FALSE, force_weak);
-		length = round(ar_size + ar_name_size, sizeof(short));
+		length = rnd(ar_size + ar_name_size, sizeof(short));
 		offset = (offset - ar_name_size) + length;
 	    }
 	    return;
@@ -1811,6 +1753,47 @@ down:
 }
 
 /*
+ * get_toc_byte_sex() guesses the byte sex of the table of contents of the
+ * library mapped in at the address, addr, of size, size based on the first
+ * object file's bytesex.  If it can't figure it out, because the library has
+ * no object file members or is malformed it will return UNKNOWN_BYTE_SEX.
+ */
+__private_extern__
+enum byte_sex
+get_toc_byte_sex(
+char *addr,
+uint32_t size)
+{
+     uint32_t magic;
+     uint32_t ar_name_size;
+     struct ar_hdr *ar_hdr;
+     char *p;
+
+	ar_hdr = (struct ar_hdr *)(addr + SARMAG);
+
+	p = addr + SARMAG + sizeof(struct ar_hdr) +
+	    rnd(strtoul(ar_hdr->ar_size, NULL, 10), sizeof(short));
+	while(p + sizeof(struct ar_hdr) + sizeof(uint32_t) < addr + size){
+	    ar_hdr = (struct ar_hdr *)p;
+	    if(strncmp(ar_hdr->ar_name, AR_EFMT1, sizeof(AR_EFMT1) - 1) == 0)
+		ar_name_size = strtoul(ar_hdr->ar_name + sizeof(AR_EFMT1) - 1,
+				       NULL, 10);
+	    else
+		ar_name_size = 0;
+	    p += sizeof(struct ar_hdr);
+	    memcpy(&magic, p + ar_name_size, sizeof(uint32_t));
+	    if(magic == MH_MAGIC || magic == MH_MAGIC_64)
+		return(get_host_byte_sex());
+	    else if(magic == SWAP_INT(MH_MAGIC) ||
+		    magic == SWAP_INT(MH_MAGIC_64))
+		return(get_host_byte_sex() == BIG_ENDIAN_BYTE_SEX ?
+		       LITTLE_ENDIAN_BYTE_SEX : BIG_ENDIAN_BYTE_SEX);
+	    p += rnd(strtoul(ar_hdr->ar_size, NULL, 10), sizeof(short));
+	}
+	return(UNKNOWN_BYTE_SEX);
+}
+
+/*
  * check_archive_arch() check the archive specified to see if it's architecture
  * does not match that of whats being loaded and if so returns FALSE.  Else it
  * returns TRUE and the archive should be attemped to be loaded from.  This is
@@ -1871,7 +1854,7 @@ unsigned long file_size)
 		      "load from it)", file_name);
 		return(FALSE);
 	    }
-	    offset += round(symdef_length, sizeof(short));
+	    offset += rnd(symdef_length, sizeof(short));
 	}
 	while(offset < file_size){
 	    if(offset + sizeof(struct ar_hdr) > file_size){
@@ -1916,7 +1899,7 @@ unsigned long file_size)
 		    }
 		}
 	    }
-	    length = round(obj_size, sizeof(short));
+	    length = rnd(obj_size, sizeof(short));
 	    offset += length;
 	}
 	if(arch_flag.cputype != 0 && mixed_types == FALSE &&
@@ -2056,7 +2039,7 @@ enum bool force_weak)
  * is unlike archive library search semantic when each library is search once
  * when encountered.
  */
-extern
+__private_extern__
 void
 search_dynamic_libs(
 void)
@@ -2447,8 +2430,8 @@ void)
 			if(nmodules < 64)
 			    nmodules = 64;
 			size = sizeof(struct prebound_dylib_command) +
-			       round(strlen(p->dylib_name) + 1, sizeof(long)) +
-			       round(nmodules / 8, sizeof(long));
+			       rnd(strlen(p->dylib_name) + 1, sizeof(long)) +
+			       rnd(nmodules / 8, sizeof(long));
 			p->pbdylib = allocate(size);
 			memset(p->pbdylib, '\0', size);
 			p->pbdylib->cmd = LC_PREBOUND_DYLIB;
@@ -2462,10 +2445,10 @@ void)
 				p->definition_obj->dysymtab->nmodtab;
 			p->pbdylib->linked_modules.offset =
 				sizeof(struct prebound_dylib_command) +
-				round(strlen(p->dylib_name) + 1, sizeof(long));
+				rnd(strlen(p->dylib_name) + 1, sizeof(long));
 			p->linked_modules = ((char *)p->pbdylib) +
 				sizeof(struct prebound_dylib_command) +
-				round(strlen(p->dylib_name) + 1, sizeof(long));
+				rnd(strlen(p->dylib_name) + 1, sizeof(long));
 		    }
 		}
 	    }
@@ -3367,7 +3350,7 @@ next_dep:	;
  * be done.  If a symbol is overridden prebinding is disabled and a warning
  * is printed.
  */
-extern
+__private_extern__
 void
 prebinding_check_for_dylib_override_symbols(
 void)
@@ -3397,7 +3380,7 @@ void)
  * where another symbol of the same name is being used from some other object
  * or dynamic library.
  */
-extern
+__private_extern__
 void
 twolevel_namespace_check_for_unused_dylib_symbols(
 void)
@@ -3620,7 +3603,7 @@ open_dylib(
 struct dynamic_library *p)
 {
     unsigned long i, file_size;
-    char *q, *colon, *file_name, *dylib_name, *file_addr;
+    char *colon, *file_name, *dylib_name, *file_addr;
     int fd;
     struct stat stat_buf;
     kern_return_t r;
@@ -3689,19 +3672,13 @@ struct dynamic_library *p)
 		file_name = p->dylib_name;
 	    }
 	}
-        strip(file_name);
-        while (q = strchr(file_name, '\\')) *q = '/';
 	if((fd = open(file_name, O_RDONLY, 0)) == -1){
-
-            if((fd = open(mkstr(next_root,file_name,NULL), O_RDONLY, 0)) == -1){
-
-	      if(undefined_flag != UNDEFINED_SUPPRESS){
-  		system_warning("can't oopen dynamic library: %s referenced "
+	    if(undefined_flag != UNDEFINED_SUPPRESS){
+		system_warning("can't open dynamic library: %s referenced "
 		    "from: %s (checking for undefined symbols may be affected)",
 		    file_name, p->definition_obj->file_name);
-	      }
-	      return(FALSE);
-            }
+	    }
+	    return(FALSE);
 	}
 
 	/*
@@ -3936,7 +3913,7 @@ struct dynamic_library *sub)
  * dylib_name specified in the dylib_command (or a new dynamic_library struct
  * for archive types).
  */
-extern
+__private_extern__
 struct dynamic_library *
 add_dynamic_lib(
 enum library_type type,
@@ -4037,7 +4014,7 @@ struct object_file *definition_obj)
  * Function for bsearch() for finding a symbol name in a dylib table of
  * contents.
  */
-extern
+__private_extern__
 int
 dylib_bsearch(
 const char *symbol_name,
@@ -4080,7 +4057,7 @@ const struct ranlib *ran)
  * merge() merges all the global information from the cur_obj into the merged
  * data structures for the output object file to be built from.
  */
-extern
+__private_extern__
 void
 merge(
 enum bool dylib_only,
@@ -4331,13 +4308,6 @@ enum bool bundle_loader)
 				"does not match cputype (%d) for specified "
 				"-arch flag: %s", mh->cputype, new_arch,
 				arch_flag.cputype, arch_flag.name);
-#ifndef RLD
-				if(told_ProjectBuilder == FALSE){
-				    tell_ProjectBuilder("Architecture "
-					"mismatch");
-				    told_ProjectBuilder = TRUE;
-				}
-#endif
 			}
 			else
 			    warning_with_cur_obj("cputype (%d, architecture %s)"
@@ -4352,13 +4322,6 @@ enum bool bundle_loader)
 				"of objects files previously loaded",
 				mh->cputype, new_arch, arch_flag.cputype,
 				prev_arch);
-#ifndef RLD
-				if(told_ProjectBuilder == FALSE){
-				    tell_ProjectBuilder("Architecture "
-					"mismatch");
-				    told_ProjectBuilder = TRUE;
-				}
-#endif
 			}
 			else
 			    warning_with_cur_obj("cputype (%d, architecture %s)"
@@ -4388,13 +4351,6 @@ enum bool bundle_loader)
 				    "%s and -force_cpusubtype_ALL not "
 				    "specified", mh->cpusubtype, new_arch,
 				    arch_flag.cpusubtype, arch_flag.name);
-#ifndef RLD
-				    if(told_ProjectBuilder == FALSE){
-					tell_ProjectBuilder("Architecture "
-					    "mismatch");
-					told_ProjectBuilder = TRUE;
-				    }
-#endif
 			    }
 			    else
 				warning_with_cur_obj("cpusubtype (%d, "
@@ -4414,13 +4370,6 @@ enum bool bundle_loader)
 				    "-force_cpusubtype_ALL not specified",
 				    mh->cpusubtype, new_arch,
 				    arch_flag.cpusubtype, prev_arch);
-#ifndef RLD
-				    if(told_ProjectBuilder == FALSE){
-					tell_ProjectBuilder("Architecture "
-					    "mismatch");
-					told_ProjectBuilder = TRUE;
-				    }
-#endif
 			    }
 			    else
 				warning_with_cur_obj("cpusubtype (%d, "
@@ -4664,7 +4613,8 @@ enum bool bundle_loader)
 		       section_type != S_SYMBOL_STUBS &&
 		       section_type != S_COALESCED &&
 		       section_type != S_MOD_INIT_FUNC_POINTERS &&
-		       section_type != S_MOD_TERM_FUNC_POINTERS){
+		       section_type != S_MOD_TERM_FUNC_POINTERS &&
+		       section_type != S_DTRACE_DOF){
 			error_with_cur_obj("unknown flags (type) of section %lu"
 					   " (%.16s,%.16s) in load command %lu",
 					   j, s->segname, s->sectname, i);
@@ -5604,7 +5554,7 @@ enum bool bundle_loader)
  * addresses from the _mh_execute_header.  This makes using the rest of the
  * code easy.
  */
-extern
+__private_extern__
 void
 merge_base_program(
 char *basefile_name,
@@ -5742,7 +5692,8 @@ unsigned long strsize)
 		       section_type != S_SYMBOL_STUBS &&
 		       section_type != S_COALESCED &&
 		       section_type != S_MOD_INIT_FUNC_POINTERS &&
-		       section_type != S_MOD_TERM_FUNC_POINTERS){
+		       section_type != S_MOD_TERM_FUNC_POINTERS &&
+		       section_type != S_DTRACE_DOF){
 			error_with_cur_obj("unknown flags (type) of section %lu"
 					   " (%.16s,%.16s) in load command %lu",
 					   j, s->segname, s->sectname, i);
@@ -6027,13 +5978,7 @@ char *filename)
  * symbols and if found sets *(int *)fail_p.
  */
 static int
-#if defined(__GLIBC__) && defined(__GLIBC_PREREQ)
-#if __GLIBC_PREREQ(2,8)
-symbol_address_compare (const void *a_p, const void *b_p, void *fail_p)
-#endif
-#else
 symbol_address_compare (void *fail_p, const void *a_p, const void *b_p)
-#endif
 {
   const struct nlist * const * aa = a_p;
   const struct nlist * a = *aa;
@@ -6184,13 +6129,8 @@ read_dwarf_info(void)
   sst = allocate (sizeof (struct nlist *) * cur_obj->symtab->nsyms);
   for (i = 0; i < cur_obj->symtab->nsyms; i++)
     sst[i] = st + i;
-#if defined(__GLIBC__) && defined(__GLIBC_PREREQ)	
-#if __GLIBC_PREREQ(2,8)
-  qsort_r (sst, cur_obj->symtab->nsyms, sizeof (struct nlist *), symbol_address_compare, &has_stabs);
-#endif
-#else
-  qsort_r (sst, cur_obj->symtab->nsyms, sizeof (struct nlist *), &has_stabs, symbol_address_compare);
-#endif
+  qsort_r (sst, cur_obj->symtab->nsyms, sizeof (struct nlist *), &has_stabs,
+	   symbol_address_compare);
   if (has_stabs) {
     error_with_cur_obj("has both STABS and DWARF debugging info");
     free (sst);

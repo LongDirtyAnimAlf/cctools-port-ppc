@@ -1,23 +1,31 @@
 /*
- * Copyright (c) 1999 Apple Computer, Inc. All rights reserved.
+ * Copyright © 2009 Apple Inc. All rights reserved.
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * This file contains Original Code and/or Modifications of Original Code
- * as defined in and that are subject to the Apple Public Source License
- * Version 2.0 (the 'License'). You may not use this file except in
- * compliance with the License. Please obtain a copy of the License at
- * http://www.opensource.apple.com/apsl/ and read it before using this
- * file.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  * 
- * The Original Code and all software distributed under the License are
- * distributed on an 'AS IS' basis, WITHOUT WARRANTY OF ANY KIND, EITHER
- * EXPRESS OR IMPLIED, AND APPLE HEREBY DISCLAIMS ALL SUCH WARRANTIES,
- * INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE, QUIET ENJOYMENT OR NON-INFRINGEMENT.
- * Please see the License for the specific language governing rights and
- * limitations under the License.
+ * 1.  Redistributions of source code must retain the above copyright notice,
+ * this list of conditions and the following disclaimer. 
+ * 2.  Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution. 
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of its
+ * contributors may be used to endorse or promote products derived from this
+ * software without specific prior written permission. 
  * 
+ * THIS SOFTWARE IS PROVIDED BY APPLE AND ITS CONTRIBUTORS "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL APPLE OR ITS CONTRIBUTORS BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
  * @APPLE_LICENSE_HEADER_END@
  */
 #include <stdio.h>
@@ -32,91 +40,91 @@
 #include "../as/i860-opcode.h"
 
 static void i860_dump_operands(
-    unsigned long opcode,
+    uint32_t opcode,
     char *format,
-    unsigned long addr,
-    unsigned long sect_addr,
+    uint32_t addr,
+    uint32_t sect_addr,
     struct relocation_info *relocs,
-    unsigned long nrelocs,
+    uint32_t nrelocs,
     struct nlist *symbols,
-    unsigned long nsymbols,
+    uint32_t nsymbols,
     struct symbol *sorted_symbols,
-    unsigned long nsorted_symbols,
+    uint32_t nsorted_symbols,
     char *strings,
-    unsigned long strings_size,
+    uint32_t strings_size,
     enum bool verbose);
 
 static void i860_dump_addr(
-    unsigned long addr_field,
+    uint32_t addr_field,
     int format,
-    long addr,
-    unsigned long sect_addr,
+    int32_t addr,
+    uint32_t sect_addr,
     struct relocation_info *relocs,
-    unsigned long nrelocs,
+    uint32_t nrelocs,
     struct nlist *symbols,
-    unsigned long nsymbols,
+    uint32_t nsymbols,
     struct symbol *sorted_symbols,
-    unsigned long nsorted_symbols,
+    uint32_t nsorted_symbols,
     char *strings,
-    unsigned long strings_size,
+    uint32_t strings_size,
     enum bool verbose);
 
 static enum bool i860_print_symbol(
-    unsigned long value,
+    uint32_t value,
     struct relocation_info *rp,
     struct nlist *symbols,
-    unsigned long nsymbols,
+    uint32_t nsymbols,
     struct symbol *sorted_symbols,
-    unsigned long nsorted_symbols,
+    uint32_t nsorted_symbols,
     char *strings,
-    unsigned long strings_size,
+    uint32_t strings_size,
     enum bool verbose);
 
 /*
  * Disassemble 1 instruction and return the length of the disassembled 
  * piece in bytes.
  */
-unsigned long
+uint32_t
 i860_disassemble(
 char *sect,
-unsigned long left,
-unsigned long addr,
-unsigned long sect_addr,
+uint32_t left,
+uint32_t addr,
+uint32_t sect_addr,
 enum byte_sex object_byte_sex,
 struct relocation_info *relocs,
-unsigned long nrelocs,
+uint32_t nrelocs,
 struct nlist *symbols,
-unsigned long nsymbols,
+uint32_t nsymbols,
 struct symbol *sorted_symbols,
-unsigned long nsorted_symbols,
+uint32_t nsorted_symbols,
 char *strings,
-unsigned long strings_size,
+uint32_t strings_size,
 enum bool verbose)
 {
     enum byte_sex host_byte_sex;
     enum bool swapped;
-    unsigned long opcode;
+    uint32_t opcode;
     int isdual;
-    unsigned long i;
+    uint32_t i;
     struct i860_opcode *op;
 
 	host_byte_sex = get_host_byte_sex();
 	swapped = host_byte_sex != object_byte_sex;
 
-	if(left < sizeof(unsigned long)){
+	if(left < sizeof(uint32_t)){
 	   if(left != 0){
 		memcpy(&opcode, sect, left);
 		if(swapped)
-		    opcode = SWAP_LONG(opcode);
+		    opcode = SWAP_INT(opcode);
 		printf(".long\t0x%08x\n", (unsigned int)opcode);
 	   }
 	   printf("(end of section)\n");
 	   return(left);
 	}
 
-	memcpy(&opcode, sect, sizeof(unsigned long));
+	memcpy(&opcode, sect, sizeof(uint32_t));
 	if(swapped)
-	    opcode = SWAP_LONG(opcode);
+	    opcode = SWAP_INT(opcode);
 
 	/*
 	 * The pad opcode, 0, is chosen as an illegal insn to fault if
@@ -155,14 +163,14 @@ enum bool verbose)
 		i860_dump_operands(opcode, (char *)op->args, addr, sect_addr,
 			relocs, nrelocs, symbols, nsymbols, sorted_symbols,
 			nsorted_symbols, strings, strings_size, verbose);
-		return(sizeof(unsigned long));
+		return(sizeof(uint32_t));
 	    }
 	}
 
 	/* Didn't find the opcode.  Dump it as a .long directive. */
 	/* Build it as a little-endian insn, in a format to match asm */
 	printf(".long\t0x%08x\n", (unsigned int)opcode);
-	return(sizeof(unsigned long));
+	return(sizeof(uint32_t));
 }
 
 /* 32 possible valuse, of which 6 are actually used. */
@@ -175,50 +183,50 @@ static char *i860_controlregs[] = {"fir", "psr", "dirbase", "db", "fsr", "epsr",
 static
 void
 i860_dump_operands(
-unsigned long opcode,
+uint32_t opcode,
 char *format,
-unsigned long addr,
-unsigned long sect_addr,
+uint32_t addr,
+uint32_t sect_addr,
 struct relocation_info *relocs,
-unsigned long nrelocs,
+uint32_t nrelocs,
 struct nlist *symbols,
-unsigned long nsymbols,
+uint32_t nsymbols,
 struct symbol *sorted_symbols,
-unsigned long nsorted_symbols,
+uint32_t nsorted_symbols,
 char *strings,
-unsigned long strings_size,
+uint32_t strings_size,
 enum bool verbose)
 {
-    unsigned long addr_field;
+    uint32_t addr_field;
 	
 	while(*format != '\0'){
 	    switch(*format){
 	    case '1': /* rs1 register, bits 11-15 of insn */
-		printf("r%lu", GET_RS1(opcode));
+		printf("r%u", GET_RS1(opcode));
 		break;
 		    
 	    case '2': /* rs2 register, bits 21-25 of insn */
-		printf("r%lu", GET_RS2(opcode));
+		printf("r%u", GET_RS2(opcode));
 		break;
 		    
 	    case 'd': /* rd register, bits 16-20 of insn */
-		printf("r%lu", GET_RD(opcode));
+		printf("r%u", GET_RD(opcode));
 		break;
 	    
 	    case 'E':	
 	    case 'e': /* frs1 floating point register, bits 11-15 of insn */
-		printf("f%lu", GET_RS1(opcode));
+		printf("f%u", GET_RS1(opcode));
 		break;
 	    
 	    case 'F':	
 	    case 'f': /* frs2 floating point register, bits 21-25 of insn */
-		printf("f%lu", GET_RS2(opcode));
+		printf("f%u", GET_RS2(opcode));
 		break;
 	    
 	    case 'H':
 	    case 'G':	
 	    case 'g': /* frsd floating point register, bits 16-20 of insn */ 
-		printf("f%lu", GET_RD(opcode));
+		printf("f%u", GET_RD(opcode));
 		break;
 		    
 	    case 'I': /* 16 bit High portion of address, I860_RELOC_HIGH */
@@ -306,15 +314,15 @@ enum bool verbose)
 		break;
 
 	    case 'D': /* constant for shift opcode */	
-		printf("%lu", opcode & 0xFFFF);
+		printf("%u", opcode & 0xFFFF);
 		break;
 		    
 	    case 'B': /* 5 bit immediate, for bte and btne insn */
-		printf("%lu", GET_RS1(opcode));
+		printf("%u", GET_RS1(opcode));
 		break;
 		    
 	    case 'C': /* Control Register */
-		printf(i860_controlregs[GET_RS2(opcode)]);
+		printf("%s", i860_controlregs[GET_RS2(opcode)]);
 		break;
 		    
 	    default:
@@ -329,21 +337,21 @@ enum bool verbose)
 static
 void
 i860_dump_addr(
-unsigned long addr_field,
+uint32_t addr_field,
 int format,
-long addr,
-unsigned long sect_addr,
+int32_t addr,
+uint32_t sect_addr,
 struct relocation_info *relocs,
-unsigned long nrelocs,
+uint32_t nrelocs,
 struct nlist *symbols,
-unsigned long nsymbols,
+uint32_t nsymbols,
 struct symbol *sorted_symbols,
-unsigned long nsorted_symbols,
+uint32_t nsorted_symbols,
 char *strings,
-unsigned long strings_size,
+uint32_t strings_size,
 enum bool verbose)
 {
-    unsigned long i;
+    uint32_t i;
     struct relocation_info *rp, *pairp;
     struct scattered_relocation_info *sreloc;
     char *prefix;
@@ -356,7 +364,7 @@ enum bool verbose)
 		    sreloc = (struct scattered_relocation_info *)(relocs + i);
 		    if(sreloc->r_type == I860_RELOC_PAIR){
 			fprintf(stderr, "Stray I860_RELOC_PAIR relocation "
-				"entry %lu\n", i);
+				"entry %u\n", i);
 			continue;
 		    }
 		    if(sreloc->r_type == I860_RELOC_HIGH ||
@@ -365,7 +373,7 @@ enum bool verbose)
 			if(i+1 >= nrelocs ||
 			   relocs[i+1].r_type != I860_RELOC_PAIR){
 				fprintf(stderr, "No I860_RELOC_PAIR relocation "
-					"entry after entry %lu\n", i);
+					"entry after entry %u\n", i);
 			}
 			else{
 			    if(((relocs[i+1].r_address) & R_SCATTERED) != 0){
@@ -374,11 +382,11 @@ enum bool verbose)
 				if(sreloc->r_type != I860_RELOC_PAIR)
 				    fprintf(stderr, "No I860_RELOC_PAIR "
 					    "relocation entry after entry "
-					    "%lu\n", i);
+					    "%u\n", i);
 			    }
 			    else if(relocs[i+1].r_type != I860_RELOC_PAIR){
 				fprintf(stderr, "No I860_RELOC_PAIR relocation "
-					"entry after entry %lu\n", i);
+					"entry after entry %u\n", i);
 			    }
 			    i++;
 			    continue;
@@ -387,10 +395,10 @@ enum bool verbose)
 		}
 		if(relocs[i].r_type == I860_RELOC_PAIR){
 		    fprintf(stderr, "Stray I860_RELOC_PAIR relocation entry "
-			    "%lu\n", i);
+			    "%u\n", i);
 		    continue;
 		}
-		if((unsigned long)relocs[i].r_address == addr - sect_addr){
+		if((uint32_t)relocs[i].r_address == addr - sect_addr){
 		    rp = &relocs[i];
 		    if(rp->r_type == I860_RELOC_HIGH ||
 		       rp->r_type == I860_RELOC_HIGHADJ ||
@@ -399,7 +407,7 @@ enum bool verbose)
 			    pairp = &rp[1];
 			    if(pairp->r_type != I860_RELOC_PAIR){
 				fprintf(stderr, "No I860_RELOC_PAIR relocation "
-					"entry after entry %lu\n", i);
+					"entry after entry %u\n", i);
 				rp = NULL;
 				pairp = NULL;
 				continue;
@@ -414,7 +422,7 @@ enum bool verbose)
 		    if(i+1 >= nrelocs ||
 		       relocs[i+1].r_type != I860_RELOC_PAIR){
 			    fprintf(stderr, "No I860_RELOC_PAIR relocation "
-				    "entry after entry %lu\n", i);
+				    "entry after entry %u\n", i);
 		    }
 		    else
 			i++;
@@ -454,11 +462,11 @@ enum bool verbose)
 	    printf("%s", prefix);
 
 	if(format == 'K' || format == 'L'){ /* branch displacement */
-	    if(i860_print_symbol(addr + 4 + ((long)addr_field), rp,
+	    if(i860_print_symbol(addr + 4 + ((int32_t)addr_field), rp,
 		     symbols, nsymbols, sorted_symbols, nsorted_symbols,
 		     strings, strings_size, verbose) == TRUE)
 		return;
-	    printf(".%+ld", (long)(addr_field + 4));
+	    printf(".%+d", (int32_t)(addr_field + 4));
 	    return;
 	}
 	if(i860_print_symbol(addr_field, rp, symbols, nsymbols,
@@ -479,17 +487,17 @@ enum bool verbose)
 static
 enum bool
 i860_print_symbol(
-unsigned long value,
+uint32_t value,
 struct relocation_info *rp,
 struct nlist *symbols,
-unsigned long nsymbols,
+uint32_t nsymbols,
 struct symbol *sorted_symbols,
-unsigned long nsorted_symbols,
+uint32_t nsorted_symbols,
 char *strings,
-unsigned long strings_size,
+uint32_t strings_size,
 enum bool verbose)
 {
-    long high, low, mid;
+    int32_t high, low, mid;
 
 	if(verbose == FALSE)
 	    return(FALSE);
@@ -497,6 +505,8 @@ enum bool verbose)
 	if(rp != NULL){
 	    if(rp->r_extern &&
 	       rp->r_symbolnum < nsymbols){
+		if(symbols[rp->r_symbolnum].n_un.n_strx > strings_size)
+		    return(FALSE);
 		if(value != 0)
 		    printf("%s+0x%x", strings +
 			   symbols[rp->r_symbolnum].n_un.n_strx,

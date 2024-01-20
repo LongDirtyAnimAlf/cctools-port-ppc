@@ -30,7 +30,7 @@
 
 #include "stuff/ofile.h"
 #include "stuff/allocate.h"
-#include "stuff/round.h"
+#include "stuff/rnd.h"
 #include "stuff/errors.h"
 #include "stuff/seg_addr_table.h"
 #include "stuff/guess_short_name.h"
@@ -101,9 +101,9 @@ char *progname = NULL;
  * size of the segments a given image for the architectures being considered.
  */
 struct max_sizes {
-    unsigned long all;
-    unsigned long read_only;
-    unsigned long read_write;
+    uint32_t all;
+    uint32_t read_only;
+    uint32_t read_write;
 };
 
 /*
@@ -124,10 +124,10 @@ struct layout_info {
     /* used only for flat layouts */
     enum bool assigned;
     char *short_name;
-    unsigned long seg1addr;
+    uint32_t seg1addr;
     /* used only for split layouts */
-    unsigned long segs_read_only_addr;
-    unsigned long segs_read_write_addr;
+    uint32_t segs_read_only_addr;
+    uint32_t segs_read_write_addr;
     /* the current entry when calling sizes_and_addresses() */
     struct seg_addr_table *current_entry;
 };
@@ -142,46 +142,46 @@ struct info {
 
     /* the parsed seg_addr_table */
     struct seg_addr_table *seg_addr_table;
-    unsigned long table_size;
+    uint32_t table_size;
 
     /* the array of pointers to info for layout for each entry */
     struct layout_info **layout_info;
 
     /* the arrays of pointers to sorted layout info for flat/split entries */
     struct layout_info **sorted_flat_layout_info;
-    unsigned long nsorted_flat;
+    uint32_t nsorted_flat;
     struct layout_info **sorted_split_read_only_layout_info;
     struct layout_info **sorted_split_read_write_layout_info;
-    unsigned long nsorted_split;
+    uint32_t nsorted_split;
 
     /* The first segment address for non-split images */
-    unsigned long seg1addr;
-    unsigned long next_flat_line;
+    uint32_t seg1addr;
+    uint32_t next_flat_line;
     enum bool allocate_flat_increasing;
 
     /* Address in the flat region where debug/profile libs will be placed */
-    unsigned long debug_seg1addr;
+    uint32_t debug_seg1addr;
     
     /* read-only and read-write segment addresses for split images*/
-    unsigned long start_segs_read_only_addr;
-    unsigned long start_segs_read_write_addr;
-    unsigned long segs_read_only_addr;
-    unsigned long segs_read_write_addr;
-    unsigned long next_split_line;
-    unsigned long default_read_only_addr;
-    unsigned long default_read_write_addr;
+    uint32_t start_segs_read_only_addr;
+    uint32_t start_segs_read_write_addr;
+    uint32_t segs_read_only_addr;
+    uint32_t segs_read_write_addr;
+    uint32_t next_split_line;
+    uint32_t default_read_only_addr;
+    uint32_t default_read_write_addr;
 
     /* the specified -arch flags */
     struct arch_flag *arch_flags;
-    unsigned long narch_flags;
+    uint32_t narch_flags;
     enum bool all_archs;
 
     /* the file name of the output seg_addr_table */
     char *output_file_name;
 
     /* the factor and amount to round applied to the sizes for layout */
-    unsigned long factor;
-    unsigned long round;
+    uint32_t factor;
+    uint32_t round;
 
     /* the -release argument for translating to SYMROOT files */
     char *release_name;
@@ -190,7 +190,7 @@ struct info {
     enum bool disablewarnings;
 
     /* Mask for determining size of the split region */
-    unsigned long overflow_mask;
+    uint32_t overflow_mask;
 
     /* The MACOSX_DEPLOYMENT_TARGET */
     struct macosx_deployment_target macosx_deployment_target;
@@ -216,30 +216,30 @@ static int qsort_split_read_write(
 
 static void flat_overlap_error(
     struct info *info,
-    unsigned long i1,
-    unsigned long i2,
+    uint32_t i1,
+    uint32_t i2,
     enum bool next_address);
 
 static void split_overlap_error(
     struct info *info,
-    unsigned long i1,
-    unsigned long i2,
+    uint32_t i1,
+    uint32_t i2,
     struct layout_info **sorted_layout_info,
     char *segment,
     enum bool next_address);
 
 static struct seg_addr_table * search_seg_addr_table_for_fixed(
     struct seg_addr_table *seg_addr_table,
-    unsigned long seg1addr,
-    unsigned long size);
+    uint32_t seg1addr,
+    uint32_t size);
 
-static unsigned long next_flat_seg1addr(
+static uint32_t next_flat_seg1addr(
     struct info *info,
-    unsigned long size);
+    uint32_t size);
 
-static unsigned long next_debug_seg1addr(
+static uint32_t next_debug_seg1addr(
     struct info *info,
-    unsigned long size);
+    uint32_t size);
 
 static char * get_image_file_name(
     struct info *info,
@@ -267,6 +267,9 @@ static void get_seg1addr(
     char *arch_name,
     void *cookie);
 
+/* apple_version is created by the libstuff/Makefile */
+extern char apple_version[];
+char *version = apple_version;
 
 /*
  * The seg_addr_table program.  It takes a file which contains the starting
@@ -280,7 +283,7 @@ char **argv,
 char **envp)
 {
     int a;
-    unsigned long i, j, used, max, size, seg1addr;
+    uint32_t i, j, used, max, size, seg1addr;
     char *endp, *user, *dylib_table_name, *base_name, *short_name,
 	 *image_file_name;
     struct dylib_table *dylib_table;
@@ -904,7 +907,7 @@ char **envp)
 		 */
 		if(strcmp(entry->install_name, FIXED_ADDRESS_AND_SIZE) == 0){
 		    if(entry->split != TRUE)
-			error("entry in seg_addr_table: %s line: %lu for fixed "
+			error("entry in seg_addr_table: %s line: %u for fixed "
 			      "address and size not to be allocated does not "
 			      "have both address and size values",
 			      info.seg_addr_table_name, entry->line);
@@ -943,7 +946,7 @@ char **envp)
 		if(image_file_name == NULL){
 		    if(info.disablewarnings == FALSE &&
 		       update == FALSE && update_overlaps == FALSE)
-			error("from seg_addr_table: %s line: %lu can't find "
+			error("from seg_addr_table: %s line: %u can't find "
 			      "file for install name: %s in -release %s",
 			      info.seg_addr_table_name, entry->line,
 			      entry->install_name, info.release_name);
@@ -952,7 +955,7 @@ char **envp)
 		if(stat(image_file_name, &stat_buf) == -1){
 		    if(info.disablewarnings == FALSE &&
 		       update == FALSE && update_overlaps == FALSE)
-			error("from seg_addr_table: %s line: %lu can't open "
+			error("from seg_addr_table: %s line: %u can't open "
 			      "file: %s", info.seg_addr_table_name, entry->line,
 			      image_file_name);
 		    continue;
@@ -1090,7 +1093,7 @@ char **envp)
 			info.sorted_flat_layout_info[i]->
 			    current_entry->seg1addr = 0;
 		    else
-			flat_overlap_error(&info, i, ULONG_MAX, TRUE);
+			flat_overlap_error(&info, i, UINT_MAX, TRUE);
 		} else if((info.allocate_flat_increasing == TRUE) &&
 		   (update == TRUE || checkonly == TRUE || 
 		    update_overlaps == TRUE) &&
@@ -1105,7 +1108,7 @@ char **envp)
 			    info.sorted_flat_layout_info[i]->
 				current_entry->seg1addr = 0;
 			else
-			    flat_overlap_error(&info, i, ULONG_MAX, TRUE);
+			    flat_overlap_error(&info, i, UINT_MAX, TRUE);
 		}
 	    }
 	    /*
@@ -1147,7 +1150,7 @@ char **envp)
 			info.sorted_split_read_only_layout_info[i]->
 			     current_entry->segs_read_only_addr = 0;
 		    else
-			split_overlap_error(&info, i, ULONG_MAX,
+			split_overlap_error(&info, i, UINT_MAX,
 			    info.sorted_split_read_only_layout_info,
 			    "read-only", TRUE);
 		}
@@ -1190,7 +1193,7 @@ char **envp)
 			info.sorted_split_read_write_layout_info[i]->
 			    current_entry->segs_read_write_addr = 0;	
 		    else
-			split_overlap_error(&info, i, ULONG_MAX,
+			split_overlap_error(&info, i, UINT_MAX,
 			    info.sorted_split_read_write_layout_info,
 				"read-write", TRUE);
 		}
@@ -1245,7 +1248,7 @@ char **envp)
 		    continue;
 		if(entry->split == FALSE){
 		    if(info.layout_info[i]->assigned == FALSE){
-			size = round(info.layout_info[i]->max_sizes.all <<
+			size = rnd(info.layout_info[i]->max_sizes.all <<
 				     info.factor, info.round);
 			if(info.layout_info[i]->use_debug_region == FALSE){
                             info.seg1addr = next_flat_seg1addr(&info, size);
@@ -1278,7 +1281,7 @@ char **envp)
 			max = info.layout_info[i]->max_sizes.read_only;
 		    else
 			max = info.layout_info[i]->max_sizes.read_write;
-		    size = round(max + info.round, info.round);
+		    size = rnd(max + info.round, info.round);
 		    info.segs_read_only_addr += size;
 		    info.segs_read_write_addr += size;
 		    if((info.layout_info[i]->segs_read_only_addr &
@@ -1430,7 +1433,7 @@ char **envp)
 		if(entry->split == FALSE && entry->seg1addr == 0 &&
 					    relayout_nonsplit == FALSE){
 		    if(info.layout_info[i]->assigned == FALSE){
-			size = round(info.layout_info[i]->max_sizes.all <<
+			size = rnd(info.layout_info[i]->max_sizes.all <<
 				     info.factor, info.round);
 			if(info.layout_info[i]->use_debug_region == FALSE){
                             info.seg1addr = next_flat_seg1addr(&info, size);
@@ -1477,7 +1480,7 @@ char **envp)
 			max = info.layout_info[i]->max_sizes.read_only;
 		    else
 			max = info.layout_info[i]->max_sizes.read_write;
-		    size = round(max+info.round, info.round);
+		    size = rnd(max+info.round, info.round);
 		    info.segs_read_only_addr += size;
 		    info.segs_read_write_addr += size;
 		    if((info.layout_info[i]->segs_read_only_addr &
@@ -1661,8 +1664,8 @@ static
 void
 flat_overlap_error(
 struct info *info,
-unsigned long i1,
-unsigned long i2,
+uint32_t i1,
+uint32_t i2,
 enum bool next_address)
 {
     struct layout_info *p1, *p2;
@@ -1700,14 +1703,14 @@ enum bool next_address)
 		      "seg_addr_table for: %s\n", p2->install_name);
 	    if(info->disablewarnings == FALSE)
 		error("address space of: %s for seg_addr_table: %s entry on "
-		      "line: %lu overlaps with: %s for entry on line: %lu",
+		      "line: %u overlaps with: %s for entry on line: %u",
 		      p1->image_file_name, info->seg_addr_table_name, f1->line,
 		      p2->image_file_name, f2->line);
 	}
 	else{
 	    if(info->disablewarnings == FALSE)
 		error("address space of: %s for seg_addr_table: %s entry on "
-		      "line: %lu overlaps with: %s for entry on line: %lu",
+		      "line: %u overlaps with: %s for entry on line: %u",
 		      p1->image_file_name, info->seg_addr_table_name, f1->line,
 		      NEXT_FLAT_ADDRESS_TO_ASSIGN, info->next_flat_line);
 	}
@@ -1725,8 +1728,8 @@ static
 void
 split_overlap_error(
 struct info *info,
-unsigned long i1,
-unsigned long i2,
+uint32_t i1,
+uint32_t i2,
 struct layout_info **sorted_layout_info,
 char *segment,
 enum bool next_address)
@@ -1748,14 +1751,14 @@ enum bool next_address)
 		      "seg_addr_table for: %s\n", p2->install_name);
 	    if(info->disablewarnings == FALSE)
 		error("%s segments of: %s for seg_addr_table: %s entry on line:"
-		  " %lu overlaps with: %s for entry on line: %lu", segment,
+		  " %u overlaps with: %s for entry on line: %u", segment,
 		  p1->image_file_name, info->seg_addr_table_name, f1->line,
 		  p2->image_file_name, f2->line);
 	}
 	else{
 	    if(info->disablewarnings == FALSE)
 		error("%s segments of: %s for seg_addr_table: %s entry on line:"
-		  " %lu overlaps with: %s for entry on line: %lu", segment,
+		  " %u overlaps with: %s for entry on line: %u", segment,
 		  p1->image_file_name, info->seg_addr_table_name, f1->line,
 		  NEXT_SPLIT_ADDRESS_TO_ASSIGN, info->next_split_line);
 	}
@@ -1770,8 +1773,8 @@ static
 struct seg_addr_table *
 search_seg_addr_table_for_fixed(
 struct seg_addr_table *seg_addr_table,
-unsigned long seg1addr,
-unsigned long size)
+uint32_t seg1addr,
+uint32_t size)
 {
     struct seg_addr_table *p;
 
@@ -1795,14 +1798,14 @@ unsigned long size)
  * 'size' if info->seg1addr of 'size' overlaps a library.
  */
 static
-unsigned long
+uint32_t
 next_flat_seg1addr(
 struct info *info,
-unsigned long size)
+uint32_t size)
 {
-    unsigned long seg1addr, start, end;
-    unsigned long i;
-    long j;
+    uint32_t seg1addr, start, end;
+    uint32_t i;
+    int32_t j;
 
 	if(info->allocate_flat_increasing == TRUE){
 	    seg1addr = info->seg1addr;
@@ -1863,13 +1866,13 @@ printf("next_flat_seg1addr() returning seg1addr = 0x%x\n",
  * 'size' if info->debug_seg1addr of 'size' overlaps a library.
  */
 static
-unsigned long
+uint32_t
 next_debug_seg1addr(
 struct info *info,
-unsigned long size)
+uint32_t size)
 {
-    unsigned long seg1addr, start, end;
-    long j;
+    uint32_t seg1addr, start, end;
+    int32_t j;
 
     seg1addr = info->debug_seg1addr - size;
     /*
@@ -2057,7 +2060,7 @@ struct ofile *ofile,
 char *arch_name,
 void *cookie)
 {
-    unsigned long i, all, read_only, read_write,
+    uint32_t i, all, read_only, read_write,
 		  segs_read_only_addr, segs_read_write_addr;
     struct load_command *lc;
     struct segment_command *sg, *first;
@@ -2084,8 +2087,8 @@ void *cookie)
 	all = 0;
 	read_only = 0;
 	read_write = 0;
-	segs_read_only_addr = ULONG_MAX;
-	segs_read_write_addr = ULONG_MAX;
+	segs_read_only_addr = UINT_MAX;
+	segs_read_write_addr = UINT_MAX;
 	for(i = 0; i < ofile->mh->ncmds; i++){
 	    if(lc->cmd == LC_SEGMENT){
 		sg = (struct segment_command *)lc;
@@ -2139,7 +2142,7 @@ void *cookie)
     struct info *info;
     char *image_file_name, *short_name, *has_suffix;
     struct stat stat_buf;
-    unsigned long seg1addr;
+    uint32_t seg1addr;
     enum bool is_framework;
 
 	/*
@@ -2177,7 +2180,7 @@ void *cookie)
 	    fprintf(out_fp, "0x%08x\t%s\n", (unsigned int)seg1addr, short_name);
 	}
 	else{
-	    error("from seg_addr_table: %s line: %lu can't open file: "
+	    error("from seg_addr_table: %s line: %u can't open file: "
 		  "%s \n", info->seg_addr_table_name, entry->line,
 		  image_file_name);
 	}
@@ -2196,10 +2199,10 @@ struct ofile *ofile,
 char *arch_name,
 void *cookie)
 {
-    unsigned long i;
+    uint32_t i;
     struct load_command *lc;
     struct segment_command *sg;
-    unsigned long *seg1addr, first_addr;
+    uint32_t *seg1addr, first_addr;
 
 	if(ofile->mh == NULL)
 	    return;
@@ -2213,7 +2216,7 @@ void *cookie)
 #endif /* DEBUG */
 
 	first_addr = 0;
-	seg1addr = (unsigned long *)cookie;
+	seg1addr = (uint32_t *)cookie;
 
 	lc = ofile->load_commands;
 	for(i = 0; i < ofile->mh->ncmds; i++){

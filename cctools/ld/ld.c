@@ -47,10 +47,7 @@
 #if !(defined(KLD) && defined(__STATIC__))
 #include <signal.h>
 #include <errno.h>
-#include <stdlib.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/param.h>
+#include <libc.h>
 #include <ar.h>
 #include <mach/mach.h>
 #include <mach/mach_error.h>
@@ -62,6 +59,7 @@
 #if defined(__OPENSTEP__) || defined(__GONZO_BUNSEN_BEAKER__)
 #include <servers/netname.h>
 #else
+#include <servers/bootstrap.h>
 #endif
 #else /* defined(KLD) && defined(__STATIC__) */
 #include <mach/mach.h>
@@ -84,24 +82,22 @@ static char *mkstr(
 #include "layout.h"
 #include "pass2.h"
 
-#include <config.h>
-
 /* name of this program as executed (argv[0]) */
-extern char *progname = NULL;
+__private_extern__ char *progname = NULL;
 /* indication of an error set in error(), for processing a number of errors
    and then exiting */
-extern unsigned long errors = 0;
+__private_extern__ unsigned long errors = 0;
 /* the pagesize of the machine this program is running on, getpagesize() value*/
-extern unsigned long host_pagesize = 0;
+__private_extern__ unsigned long host_pagesize = 0;
 /* the byte sex of the machine this program is running on */
-extern enum byte_sex host_byte_sex = UNKNOWN_BYTE_SEX;
+__private_extern__ enum byte_sex host_byte_sex = UNKNOWN_BYTE_SEX;
 
 /* name of output file */
-extern char *outputfile = NULL;
+__private_extern__ char *outputfile = NULL;
 /* type of output file */
-extern unsigned long filetype = MH_EXECUTE;
+__private_extern__ unsigned long filetype = MH_EXECUTE;
 /* multi or single module dylib output */
-extern enum bool multi_module_dylib = TRUE;
+__private_extern__ enum bool multi_module_dylib = TRUE;
 #ifndef RLD
 static enum bool filetype_specified = FALSE;
 static enum bool moduletype_specified = FALSE;
@@ -114,85 +110,87 @@ static enum bool Aflag_specified = FALSE;
  * cputype and cpusubtype.  specific_arch_flag is true if an -arch flag is
  * specified and the flag for a specific implementation of an architecture.
  */
-extern struct arch_flag arch_flag =
+__private_extern__ struct arch_flag arch_flag =
 #if defined(KLD) && defined(__STATIC__)
+
 #ifdef __ppc__
     { "ppc",    CPU_TYPE_POWERPC, CPU_SUBTYPE_POWERPC_ALL };
 #elif __i386__
     { "i386",   CPU_TYPE_I386,    CPU_SUBTYPE_I386_ALL };
 #elif __arm__
-    { "arm",    CPU_TYPE_ARM,     CPU_SUBTYPE_ARM_ALL };
-#elif
+    { "arm",	CPU_TYPE_ARM,     CPU_SUBTYPE_ARM_ALL };
+#else
 #error "unsupported architecture for static KLD"
 #endif
+
 #else /* !(defined(KLD) && defined(__STATIC__)) */
     { 0 };
 #endif /* defined(KLD) && defined(__STATIC__) */
-extern enum bool specific_arch_flag = FALSE;
+__private_extern__ enum bool specific_arch_flag = FALSE;
 
 /*
  * The -force_cpusubtype_ALL flag.
  */
-extern enum bool force_cpusubtype_ALL = FALSE;
+__private_extern__ enum bool force_cpusubtype_ALL = FALSE;
 
 /* the byte sex of the output file */
-extern enum byte_sex target_byte_sex = UNKNOWN_BYTE_SEX;
+__private_extern__ enum byte_sex target_byte_sex = UNKNOWN_BYTE_SEX;
 static enum bool arch_multiple = FALSE;	/* print one arch message before error*/
 
-extern
+__private_extern__
 enum bool trace = FALSE;		/* print stages of link-editing */
-extern
+__private_extern__
 enum bool save_reloc = FALSE;		/* save relocation information */
-extern
+__private_extern__
 enum bool output_for_dyld = FALSE;	/* produce output for use with dyld */
-extern
+__private_extern__
 enum bool bind_at_load = FALSE;		/* mark the output for dyld to be bound
 					   when loaded */
-extern
+__private_extern__
 enum bool no_fix_prebinding = FALSE;	/* mark the output for dyld to never
 					   run fix_prebinding */
-extern
+__private_extern__
 enum bool load_map = FALSE;		/* print a load map */
-extern
+__private_extern__
 enum bool define_comldsyms = TRUE;	/* define common and link-editor defined
 					   symbol reguardless of file type */
 #ifndef RLD
 static enum bool
     dflag_specified = FALSE;		/* the -d flag has been specified */
 #endif /* !defined(RLD) */
-extern
+__private_extern__
 enum bool seglinkedit = FALSE;		/* create the link edit segment */
 #ifndef RLD
 static enum bool
     seglinkedit_specified = FALSE;	/* if either -seglinkedit or */
 					/*  -noseglinkedit was specified */
 #endif /* !defined(RLD) */
-extern
+__private_extern__
 enum bool whyload = FALSE;		/* print why archive members are
 					   loaded */
 #ifndef RLD
 static enum bool whatsloaded = FALSE;	/* print which object files are loaded*/
 #endif /* !defined(RLD) */
-extern
+__private_extern__
 enum bool flush = TRUE;			/* Use the output_flush routine to flush
 					   output file by pages */
-extern
+__private_extern__
 enum bool sectorder_detail = FALSE;	/* print sectorder warnings in detail */
-extern
+__private_extern__
 enum bool nowarnings = FALSE;		/* suppress warnings */
-extern
+__private_extern__
 enum bool no_arch_warnings = FALSE;	/* suppress wrong arch warnings */
-extern
+__private_extern__
 enum bool arch_errors_fatal = FALSE;	/* cause wrong arch errors to be fatal*/
-extern
+__private_extern__
 enum bool archive_ObjC = FALSE;		/* objective-C archive semantics */
-extern
+__private_extern__
 enum bool archive_all = FALSE;		/* always load everything in archives */
-extern
+__private_extern__
 enum bool keep_private_externs = FALSE;	/* don't turn private externs into
 					   non-external symbols */
 /* TRUE if -dynamic is specified, FALSE if -static is specified */
-extern
+__private_extern__
 enum bool dynamic = TRUE;
 #ifndef RLD
 static enum bool dynamic_specified = FALSE;
@@ -200,16 +198,16 @@ static enum bool static_specified = FALSE;
 #endif
 
 /* The level of symbol table stripping */
-extern enum strip_levels strip_level = STRIP_DUP_INCLS;
+__private_extern__ enum strip_levels strip_level = STRIP_DUP_INCLS;
 /* Strip the base file symbols (the -A argument's symbols) */
-extern enum bool strip_base_symbols = FALSE;
+__private_extern__ enum bool strip_base_symbols = FALSE;
 
 /* strip dead blocks */
-extern enum bool dead_strip = FALSE;
+__private_extern__ enum bool dead_strip = FALSE;
 /* don't strip module init and term sections */
-extern enum bool no_dead_strip_inits_and_terms = FALSE;
+__private_extern__ enum bool no_dead_strip_inits_and_terms = FALSE;
 /* print timings for dead striping code */
-extern enum bool dead_strip_times = FALSE;
+__private_extern__ enum bool dead_strip_times = FALSE;
 
 #ifndef RLD
 /*
@@ -217,75 +215,75 @@ extern enum bool dead_strip_times = FALSE;
  * save_symbols is the names of the symbols from -exported_symbols_list
  * remove_symbols is the names of the symbols from -unexported_symbols_list
  */
-extern struct symbol_list *save_symbols = NULL;
-extern unsigned long nsave_symbols = 0;
-extern struct symbol_list *remove_symbols = NULL;
-extern unsigned long nremove_symbols = 0;
+__private_extern__ struct symbol_list *save_symbols = NULL;
+__private_extern__ uint32_t nsave_symbols = 0;
+__private_extern__ struct symbol_list *remove_symbols = NULL;
+__private_extern__ uint32_t nremove_symbols = 0;
 
 /*
  * -executable_path option's argument, executable_path is used to replace
  * @executable_path for dependent libraries.
  */
-extern char *executable_path = NULL;
+__private_extern__ char *executable_path = NULL;
 #endif /* RLD */
 
 
 /* The list of symbols to be traced */
-extern char **trace_syms = NULL;
-extern unsigned long ntrace_syms = 0;
+__private_extern__ char **trace_syms = NULL;
+__private_extern__ unsigned long ntrace_syms = 0;
 
 /* The number of references of undefined symbols to print */
-extern unsigned long Yflag = 0;
+__private_extern__ unsigned long Yflag = 0;
 
 /* The list of allowed undefined symbols */
-extern char **undef_syms = NULL;
-extern unsigned long nundef_syms = 0;
+__private_extern__ char **undef_syms = NULL;
+__private_extern__ unsigned long nundef_syms = 0;
 
 /* The list of -dylib_file arguments */
-extern char **dylib_files = NULL;
-extern unsigned long ndylib_files = 0;
+__private_extern__ char **dylib_files = NULL;
+__private_extern__ unsigned long ndylib_files = 0;
 
 /* The checking for undefined symbols */
-extern enum undefined_check_level undefined_flag = UNDEFINED_ERROR;
+__private_extern__ enum undefined_check_level undefined_flag = UNDEFINED_ERROR;
 #ifndef RLD
 static enum bool undefined_flag_specified = FALSE;
 #endif
 
 /* The checking for (twolevel namespace) multiply defined symbols */
-extern enum multiply_defined_check_level
+__private_extern__ enum multiply_defined_check_level
     multiply_defined_flag = MULTIPLY_DEFINED_WARNING;
-extern enum multiply_defined_check_level
+__private_extern__ enum multiply_defined_check_level
     multiply_defined_unused_flag = MULTIPLY_DEFINED_SUPPRESS;
 /* the -nomultidefs option */
-extern enum bool nomultidefs = FALSE;
+__private_extern__ enum bool nomultidefs = FALSE;
 #ifndef RLD
 static enum bool multiply_defined_flag_specified = FALSE;
 static enum bool multiply_defined_unused_flag_specified = FALSE;
 #endif
 
 /* The checking for read only relocs */
-extern enum read_only_reloc_check_level
+__private_extern__ enum read_only_reloc_check_level
     read_only_reloc_flag = READ_ONLY_RELOC_ERROR;
 
 /* The checking for section difference relocs */
-extern enum sect_diff_reloc_check_level
+__private_extern__ enum sect_diff_reloc_check_level
     sect_diff_reloc_flag = SECT_DIFF_RELOC_SUPPRESS;
 
 /* The handling for weak reference mismatches */
-extern enum weak_reference_mismatches_handling
+__private_extern__ enum weak_reference_mismatches_handling
     weak_reference_mismatches = WEAK_REFS_MISMATCH_ERROR;
 
 /* The Mac OS X deployment target */
-extern struct macosx_deployment_target
+__private_extern__ struct macosx_deployment_target
 	macosx_deployment_target = { 0 };
 
 /* The prebinding optimization */
 #ifndef RLD
 static enum bool prebinding_flag_specified = FALSE;
 #endif
-extern enum bool prebinding = FALSE;
-extern enum bool prebind_allow_overlap = FALSE;
-extern enum bool prebind_all_twolevel_modules = FALSE;
+__private_extern__ enum bool prebinding = FALSE;
+__private_extern__ enum bool prebind_allow_overlap = FALSE;
+__private_extern__ enum bool prebind_all_twolevel_modules = FALSE;
 #ifndef RLD
 static enum bool read_only_reloc_flag_specified = FALSE;
 static enum bool sect_diff_reloc_flag_specified = FALSE;
@@ -297,29 +295,29 @@ static enum bool unprebound_library(
 #endif
 
 /* True if -m is specified to allow multiply symbols, as a warning */
-extern enum bool allow_multiply_defined_symbols = FALSE;
+__private_extern__ enum bool allow_multiply_defined_symbols = FALSE;
 
 /* The segment alignment and pagezero_size, note the segalign is reset in
  * layout() by get_segalign_from_flag() based on the target architecture.
  */
-extern unsigned long segalign = 0x2000;
+__private_extern__ unsigned long segalign = 0x2000;
 #ifndef RLD
-extern enum bool segalign_specified = FALSE;
+__private_extern__ enum bool segalign_specified = FALSE;
 #endif /* !defined(RLD) */
-extern unsigned long pagezero_size = 0;
+__private_extern__ unsigned long pagezero_size = 0;
 
 /* The default section alignment */
-extern unsigned long defaultsectalign = DEFAULTSECTALIGN;
+__private_extern__ unsigned long defaultsectalign = DEFAULTSECTALIGN;
 
 /* The first segment address */
-extern unsigned long seg1addr = 0;
-extern enum bool seg1addr_specified = FALSE;
+__private_extern__ unsigned long seg1addr = 0;
+__private_extern__ enum bool seg1addr_specified = FALSE;
 
 /* read-only and read-write segment addresses */
-extern unsigned long segs_read_only_addr = 0;
-extern enum bool segs_read_only_addr_specified = FALSE;
-extern unsigned long segs_read_write_addr = 0;
-extern enum bool segs_read_write_addr_specified = FALSE;
+__private_extern__ unsigned long segs_read_only_addr = 0;
+__private_extern__ enum bool segs_read_only_addr_specified = FALSE;
+__private_extern__ unsigned long segs_read_write_addr = 0;
+__private_extern__ enum bool segs_read_write_addr_specified = FALSE;
 
 #ifndef RLD
 /* file name of the segment address table */
@@ -329,13 +327,13 @@ static char *seg_addr_table_filename = NULL;
 #endif /* !defined(RLD) */
 
 /* The stack address and size */
-extern unsigned long stack_addr = 0;
-extern enum bool stack_addr_specified = FALSE;
-extern unsigned long stack_size = 0;
-extern enum bool stack_size_specified = FALSE;
+__private_extern__ unsigned long stack_addr = 0;
+__private_extern__ enum bool stack_addr_specified = FALSE;
+__private_extern__ unsigned long stack_size = 0;
+__private_extern__ enum bool stack_size_specified = FALSE;
 
 /* TRUE if -allow_stack_execute is specified */
-extern enum bool allow_stack_execute = FALSE;
+__private_extern__ enum bool allow_stack_execute = FALSE;
 
 #ifndef RLD
 /* A -segaddr option was specified */
@@ -347,7 +345,7 @@ static enum bool segaddr_specified = FALSE;
  * that if /bin/objcunique is run on the result and up to two sections can be
  * added.
  */
-extern unsigned long headerpad = sizeof(struct section) * 2;
+__private_extern__ unsigned long headerpad = sizeof(struct section) * 2;
 #ifndef RLD
 static enum bool headerpad_specified = FALSE;
 #endif /* !defined(RLD) */
@@ -355,38 +353,38 @@ static enum bool headerpad_specified = FALSE;
  * If specified makes sure the header pad is big enough to change all the
  * install name of the dylibs in the output to MAXPATHLEN.
  */
-extern enum bool headerpad_max_install_names = FALSE;
+__private_extern__ enum bool headerpad_max_install_names = FALSE;
 
 /* The name of the specified entry point */
-extern char *entry_point_name = NULL;
+__private_extern__ char *entry_point_name = NULL;
 
 /* The name of the specified library initialization routine */
-extern char *init_name = NULL;
+__private_extern__ char *init_name = NULL;
 
 /* The dylib information */
-extern char *dylib_install_name = NULL;
-extern unsigned long dylib_current_version = 0;
-extern unsigned long dylib_compatibility_version = 0;
+__private_extern__ char *dylib_install_name = NULL;
+__private_extern__ uint32_t dylib_current_version = 0;
+__private_extern__ uint32_t dylib_compatibility_version = 0;
 
 /* the umbrella/sub/client framework information */
-extern enum bool sub_framework = FALSE;
-extern enum bool umbrella_framework = FALSE;
-extern char *sub_framework_name = NULL;
-extern char *umbrella_framework_name = NULL;
-extern char *client_name = NULL;
-extern char **allowable_clients = NULL;
-extern unsigned long nallowable_clients = 0;
+__private_extern__ enum bool sub_framework = FALSE;
+__private_extern__ enum bool umbrella_framework = FALSE;
+__private_extern__ char *sub_framework_name = NULL;
+__private_extern__ char *umbrella_framework_name = NULL;
+__private_extern__ char *client_name = NULL;
+__private_extern__ char **allowable_clients = NULL;
+__private_extern__ unsigned long nallowable_clients = 0;
 
 /* The list of sub_umbrella frameworks */
-extern char **sub_umbrellas = NULL;
-extern unsigned long nsub_umbrellas = 0;
+__private_extern__ char **sub_umbrellas = NULL;
+__private_extern__ unsigned long nsub_umbrellas = 0;
 
 /* The list of sub_library dynamic libraries */
-extern char **sub_librarys = NULL;
-extern unsigned long nsub_librarys = 0;
+__private_extern__ char **sub_librarys = NULL;
+__private_extern__ unsigned long nsub_librarys = 0;
 
 /* The dylinker information */
-extern char *dylinker_install_name = NULL;
+__private_extern__ char *dylinker_install_name = NULL;
 
 #ifndef RLD
 /* set to the -bundle_loader argument if specified */
@@ -394,25 +392,25 @@ static char *bundle_loader = NULL;
 #endif
 
 /* set to TRUE if -private_bundle is specified */
-extern enum bool private_bundle = FALSE;
+__private_extern__ enum bool private_bundle = FALSE;
 
 /* The value of the environment variable NEXT_ROOT or the -syslibroot argument*/
-extern char *next_root = NULL;
+__private_extern__ char *next_root = NULL;
 #ifndef RLD
 static enum bool syslibroot_specified = FALSE;
 #endif
 
 /* TRUE if the environment variable LD_TRACE_ARCHIVES
    (or temporarily RC_TRACE_ARCHIVES) is set */
-extern enum bool ld_trace_archives = FALSE;
+__private_extern__ enum bool ld_trace_archives = FALSE;
 
 /* TRUE if the environment variable LD_TRACE_DYLIBS
    (or temporarily RC_TRACE_DYLIBS) is set */
-extern enum bool ld_trace_dylibs = FALSE;
+__private_extern__ enum bool ld_trace_dylibs = FALSE;
 
 /* TRUE if the environment variable LD_TRACE_PREBINDING_DISABLED
    (or temporarily LD_TRACE_PREBINDING_DISABLED) is set */
-extern enum bool ld_trace_prebinding_disabled = FALSE;
+__private_extern__ enum bool ld_trace_prebinding_disabled = FALSE;
 
 #ifndef KLD
 /* The file LD_TRACE_FILE references, or NULL if none is set */
@@ -420,15 +418,17 @@ static const char *trace_file_path = NULL;
 #endif
 
 /* the argument to -final_output if any */
-extern char *final_output = NULL;
+__private_extern__ char *final_output = NULL;
 
 /* The variables to support namespace options */
-extern enum bool namespace_specified = FALSE;
-extern enum bool twolevel_namespace = TRUE;
-extern enum bool force_flat_namespace = FALSE;
+__private_extern__ enum bool namespace_specified = FALSE;
+__private_extern__ enum bool twolevel_namespace = TRUE;
+__private_extern__ enum bool force_flat_namespace = FALSE;
 
+#ifndef RLD
 /* Variable to support options logging.  */
 static enum bool ld_print_options = FALSE;
+#endif
 
 /*
  * Because the MacOS X 10.0 code in libSystem for the NSObjectFileImage*() APIs
@@ -441,25 +441,18 @@ static enum bool ld_print_options = FALSE;
 #ifndef RLD
 static enum bool twolevel_namespace_hints_specified = FALSE;
 #endif
-extern enum bool twolevel_namespace_hints = TRUE;
+__private_extern__ enum bool twolevel_namespace_hints = TRUE;
 
 #ifdef DEBUG
-extern unsigned long debug = 0;	/* link-editor debugging */
+__private_extern__ unsigned long debug = 0;	/* link-editor debugging */
 #endif /* DEBUG */
 
 #ifdef RLD
 /* the cleanup routine for fatal errors to remove the output file */
-extern void cleanup(void);
+__private_extern__ void cleanup(void);
 #else /* !defined(RLD) */
 static void cleanup(void);
 static void ld_exit(int exit_value);
-
-/*
- * This is for the ProjectBuilder (formally MakeApp) interface.
- */
-static int talking_to_ProjectBuilder = 0;
-static mach_port_t ProjectBuilder_port;
-static void check_for_ProjectBuilder(void);
 
 /* The signal hander routine for SIGINT, SIGTERM, SIGBUS & SIGSEGV */
 static void handler(int sig);
@@ -469,7 +462,7 @@ static enum bool ispoweroftwo(unsigned long x);
 static vm_prot_t getprot(char *prot, char **endp);
 static enum bool check_max_init_prot(vm_prot_t maxprot, vm_prot_t initprot);
 
-/* apple_version is in ld_vers.c which is created by the Makefile */
+/* apple_version is created by the libstuff/Makefile */
 extern char apple_version[];
 
 /*
@@ -483,7 +476,7 @@ char *envp[])
 {
     int i;
     unsigned long j, symbols_created, objects_specified, sections_created;
-    unsigned long table_size;
+    uint32_t table_size;
     int fd;
     char *p, *symbol_name, *indr_symbol_name, *endp, *file_name;
     char *filelist, *dirname, *addr, *env_seg_addr_table_name;
@@ -509,7 +502,6 @@ char *envp[])
     enum bool prebinding_via_LD_PREBIND;
     enum bool hash_instrument_specified;
     char *ld_library_path;
-    char cwdbuff[MAXPATHLEN];
 
 #ifdef __MWERKS__
     char **dummy;
@@ -546,9 +538,6 @@ char *envp[])
 	if(signal(SIGSEGV, SIG_IGN) != SIG_IGN)
 	    signal(SIGSEGV, handler);
 
-	/* If ProjectBuilder is around set up for it */
-	check_for_ProjectBuilder();
-
 	/* This needs to be here so that we test the environment variable before
 	   the rest of options parsing.  */
 	if (getenv("LD_PRINT_OPTIONS") != NULL)
@@ -570,18 +559,8 @@ char *envp[])
 	        if (ld_print_options == TRUE)
 		  print("[Logging ld options]\t%s\n", argv[i]);
 
-		p = &(argv[i][1]);
-
-		/* iPhone binutils local: allow -compatibility_version and
-		 * -current_version as synonyms for -dylib_compatibility_version and
-		 * -dylib_current_version, for compatibility with GNU libtool */
-		if (!strcmp(p, "compatibility_version") || !strcmp(p, "current_version"))
-		    asprintf(&p, "dylib_%s", p);
-
+	        p = &(argv[i][1]);
 		switch(*p){
-		case 'B': 
-		    if(strcmp(p, "Bstatic") && strcmp(p, "Bdynamic")) goto unknown_flag;
-		    break;
 		case 'l':
 		    if(p[1] == '\0')
 			fatal("-l: argument missing");
@@ -1437,6 +1416,10 @@ char *envp[])
 				  "-arch %s", argv[i]);
 			    fatal("Usage: %s [options] file [...]", progname);
 			}
+			/* Default to -single_module on ARM. */
+			if(arch_flag.cputype == CPU_TYPE_ARM){
+			    multi_module_dylib = FALSE;
+			}
 			target_byte_sex = get_byte_sex_from_flag(&arch_flag);
 		    }
 		    /* specify an allowable client of this subframework
@@ -1448,25 +1431,6 @@ char *envp[])
 				    (nallowable_clients + 1) * sizeof(char *));
 			allowable_clients[nallowable_clients++] = argv[i+1];
 			i += 1;
-			break;
-		    }
-		    /* -aspen_version_min for overriding
-		       MACOSX_DEPLOYMENT_TARGET on command line */
-		    else if(
-                        strcmp (p, "aspen_version_min") == 0 ||
-                        strcmp (p, "iphoneos_version_min") == 0
-                    ){
-			if(++i >= argc)
-			    fatal("%s: argument missing", argv[i]);
-			if (strcmp(argv[i], "1.0"))
-			    put_macosx_deployment_target ("10.4");
-			else if (
-                            strcmp(argv[i], "1.2") ||
-			    strcmp(argv[i], "2.0")
-                        )
-			    put_macosx_deployment_target ("10.5");
-			else
-			    fatal("%s: unknown version", argv[i]);
 			break;
 		    }
 		    else
@@ -1904,8 +1868,7 @@ char *envp[])
 		case 'v':
 		    if(strcmp(p, "v") == 0){
 			vflag = TRUE;
-			printf("Apple Computer, Inc. version %s\n",
-			       apple_version);
+			printf("Apple Inc. version %s\n", apple_version);
 		    }
 		    else
 			goto unknown_flag;
@@ -1915,6 +1878,19 @@ char *envp[])
 unknown_flag:
 		    fatal("unknown flag: %s", argv[i]);
 		}
+	    }
+	}
+
+	/*
+	 * -sub_umbrella and -sub_library are not supported on ARM.
+	 * See <rdar://problem/4771657>.
+	 */
+	if(arch_flag.cputype == CPU_TYPE_ARM){
+	    if(sub_umbrellas != NULL){
+	        fatal("-sub_umbrella is not supported on ARM");
+	    }
+	    if(sub_librarys != NULL){
+	        fatal("-sub_library is not supported on ARM");
 	    }
 	}
 
@@ -1932,16 +1908,6 @@ unknown_flag:
 	else{
 	    next_root = p;
 	}
-	if(next_root == NULL) {
-#ifdef CROSS_SYSROOT
-	    next_root = CROSS_SYSROOT;
-#endif
-	}
-	if(next_root == NULL) {
-          getLibraryPath(cwdbuff, sizeof(cwdbuff));
-          next_root = cwdbuff;
-	}
-
 	if(next_root != NULL){
 	    for(i = 0; standard_dirs[i] != NULL; i++){
 		p = allocate(strlen(next_root) +
@@ -2320,7 +2286,7 @@ unknown_flag:
 			    warning("-read_only_relocs %s ignored, when using "
 				    "with format produced with the "
 				    "-segs_read_only_addr option (via the "
-				    "segment address table: %s %s line %lu)",
+				    "segment address table: %s %s line %u)",
 		      		    read_only_reloc_flag ==
 					READ_ONLY_RELOC_WARNING ?
 				    "warning" : "suppress",
@@ -2334,7 +2300,7 @@ unknown_flag:
 			    warning("-seg1addr 0x%x ignored, using "
 				    "-segs_read_only_addr 0x%x and "
 				    "-segs_read_write_addr 0x%x from segment "
-				    "address table: %s %s line %lu",
+				    "address table: %s %s line %u",
 				    (unsigned int)seg1addr,
 				    (unsigned int)seg_addr_table_entry->
 					    segs_read_only_addr,
@@ -2350,7 +2316,7 @@ unknown_flag:
 				    seg_addr_table_entry->segs_read_only_addr){
 			    warning("-segs_read_only_addr 0x%x ignored, using "
 				    "-segs_read_only_addr 0x%x from segment "
-				    "address table: %s %s line %lu",
+				    "address table: %s %s line %u",
 				    (unsigned int)segs_read_only_addr,
 				    (unsigned int)seg_addr_table_entry->
 					    segs_read_only_addr,
@@ -2364,7 +2330,7 @@ unknown_flag:
 				    seg_addr_table_entry->segs_read_write_addr){
 			    warning("-segs_read_write_addr 0x%x ignored, using "
 				    "-segs_read_write_addr 0x%x from segment "
-				    "address table: %s %s line %lu",
+				    "address table: %s %s line %u",
 				    (unsigned int)segs_read_write_addr,
 				    (unsigned int)seg_addr_table_entry->
 					    segs_read_write_addr,
@@ -2383,9 +2349,9 @@ unknown_flag:
 				seg_addr_table_entry->segs_read_write_addr;
 			if(segs_read_only_addr == 0 &&
 			   segs_read_write_addr == 0){
-			    segs_read_write_addr = get_shared_region_sz_from_flag(&arch_flag);
+			    segs_read_write_addr = get_shared_region_size_from_flag(&arch_flag);
 			    warning("-segs_read_write_addr 0x0 ignored from "
-				    "segment address table: %s %s line %lu "
+				    "segment address table: %s %s line %u "
 				    "using -segs_read_write_addr 0x%x",
 				    env_seg_addr_table_name != NULL ?
 				    "LD_SEG_ADDR_TABLE" : "-seg_addr_table",
@@ -2399,7 +2365,7 @@ unknown_flag:
 			   seg1addr != seg_addr_table_entry->seg1addr){
 			    warning("-seg1addr 0x%x ignored, using "
 				    "-seg1addr 0x%x from segment address "
-				    "table: %s %s line %lu",
+				    "table: %s %s line %u",
 				    (unsigned int)seg1addr,
 				    (unsigned int)seg_addr_table_entry->
 					    seg1addr,
@@ -2411,7 +2377,7 @@ unknown_flag:
 			if(segs_read_only_addr_specified){
 			    warning("-segs_read_only_addr 0x%x ignored, using "
 				    "-seg1addr 0x%x from segment address "
-				    "table: %s %s line %lu",
+				    "table: %s %s line %u",
 				    (unsigned int)segs_read_only_addr,
 				    (unsigned int)seg_addr_table_entry->
 					    seg1addr,
@@ -2423,7 +2389,7 @@ unknown_flag:
 			if(segs_read_write_addr_specified){
 			    warning("-segs_read_write_addr 0x%x ignored, using "
 				    "-seg1addr 0x%x from segment address "
-				    "table: %s %s line %lu",
+				    "table: %s %s line %u",
 				    (unsigned int)segs_read_write_addr,
 				    (unsigned int)seg_addr_table_entry->
 					    seg1addr,
@@ -2504,13 +2470,22 @@ unknown_flag:
 	 */
 	if(macosx_deployment_target.major >= 4){
 	    if(filetype != MH_DYLIB){
-		if(prebinding_via_LD_PREBIND == FALSE &&
-		   prebinding_flag_specified == TRUE &&
-		   prebinding == TRUE){
-		    warning("-prebind ignored because MACOSX_DEPLOYMENT_TARGET "
-			    "environment variable greater or equal to 10.4");
+		/* 
+		 * If this is arm* or xscale, we want to prebind executables
+		 * too, not just dylibs and frameworks. 
+		 */
+		if (!((arch_flag.name != NULL) && 
+		      ((strncmp(arch_flag.name, "arm", 3) == 0) ||
+		       (strcmp(arch_flag.name, "xscale") == 0))))
+		{
+		    if(prebinding_via_LD_PREBIND == FALSE &&
+		       prebinding_flag_specified == TRUE &&
+		       prebinding == TRUE){
+			warning("-prebind ignored because MACOSX_DEPLOYMENT_TARGET "
+				"environment variable greater or equal to 10.4");
+		    }
+		    prebinding = FALSE;
 		}
-		prebinding = FALSE;
 	    }
 	    /*
 	     * This is an MH_DYLIB.  First see if it is on the list of libraries
@@ -2547,19 +2522,22 @@ unknown_flag:
 		     */
 		    if(seg_addr_table_entry == NULL &&
 		       getenv("LD_SPLITSEGS_NEW_LIBRARIES") != NULL){
+		    unsigned long arch_rw_addr =
+			get_shared_region_size_from_flag(&arch_flag);
+
 			if(seg1addr_specified){
 			    warning("-seg1addr 0x%x ignored, using "
 				    "-segs_read_only_addr 0x%x and "
 				    "-segs_read_write_addr 0x%x because "
 				    "LD_SPLITSEGS_NEW_LIBRARIES environment is "
 				    "set",(unsigned int)seg1addr, 0,
-				    get_shared_region_sz_from_flag(&arch_flag));
+				    (unsigned int)arch_rw_addr);
 			}
 			seg1addr_specified = FALSE;
 			seg1addr = 0;
 			segs_read_only_addr_specified = TRUE;
 			segs_read_only_addr = 0;
-			segs_read_write_addr = get_shared_region_sz_from_flag(&arch_flag);
+			segs_read_write_addr = arch_rw_addr;
 		    }
 		    /*
 		     * Finally if this is not a split library then turn off
@@ -2631,10 +2609,10 @@ unknown_flag:
 		warning("flag: -dylib_install_name %s ignored (-dylib "
 			"was not specified", dylib_install_name);
 	    if(dylib_current_version != 0)
-		warning("flag: -dylib_current_version %lu ignored (-dylib "
+		warning("flag: -dylib_current_version %u ignored (-dylib "
 			"was not specified", dylib_current_version);
 	    if(dylib_compatibility_version != 0)
-		warning("flag: -dylib_compatibility_version %lu ignored (-dylib"
+		warning("flag: -dylib_compatibility_version %u ignored (-dylib"
 			" was not specified", dylib_compatibility_version);
 	    if(init_name != NULL)
 		warning("flag: -init %s ignored (-dylib was not specified",
@@ -2754,16 +2732,6 @@ unknown_flag:
 	    else{
 		p = &(argv[i][1]);
 		switch(*p){
-		case 'B':
-		    if(strcmp(p, "Bstatic") == 0){
-			search_lib_extensions[0]=".a";
-			search_lib_extensions[1]=".dylib";
-			break;
-		    } else if (strcmp(p, "Bdynamic") == 0){
-			search_lib_extensions[0]=".dylib";
-			search_lib_extensions[1]=".a";
-			break;
-		    }
 		case 'b':
 		    if(strcmp(p, "bundle_loader") == 0){
 			/*
@@ -3346,62 +3314,6 @@ vm_prot_t initprot)
 }
 
 /*
- * check_for_ProjectBuilder() is called once before any error messages are
- * generated and sets up what is needed to send error messages to project
- * builder.
- */
-static
-void
-check_for_ProjectBuilder(void)
-{
-#if OLD_PROJECTBUILDER_INTERFACE
-    char *portName;
-#if defined(__OPENSTEP__) || defined(__GONZO_BUNSEN_BEAKER__)
-    char *hostName;
-
-	hostName = getenv("MAKEHOST");
-	if(hostName == NULL)
-	    hostName = "";
-#endif
-	portName = getenv("MAKEPORT");
-	if(portName == NULL)
-	    return;
-#if defined(__OPENSTEP__) || defined(__GONZO_BUNSEN_BEAKER__)
-	if(netname_look_up(name_server_port, hostName, portName,
-	   (int *)&ProjectBuilder_port) != KERN_SUCCESS)
-	    return;
-#else
-	if(bootstrap_look_up(bootstrap_port, portName,
-	   (unsigned int *)&ProjectBuilder_port) != KERN_SUCCESS)
-	    return;
-#endif
-	if(ProjectBuilder_port == MACH_PORT_NULL)
-	    return;
-	talking_to_ProjectBuilder = 1;
-#endif
-}
-
-/*
- * tell_ProjectBuilder() sends the message to project builder if talking to
- * project builder.
- */
-extern
-void
-tell_ProjectBuilder(
-char *message)
-{
-#if OLD_PROJECTBUILDER_INTERFACE
-	make_alert(ProjectBuilder_port,
-	    2, /* eventType */
-	    NULL, 0, /* functionName, not used by ProjectBuilder */
-	    NULL, 0, /* fileName */
-	    NULL, 0, /* directory */
-	    0, /* line */
-	    message, strlen(message)+1 > 1024 ? 1024 : strlen(message)+1);
-#endif
-}
-
-/*
  * ld_exit() is use for all exit()s from the link editor.
  */
 static
@@ -3409,8 +3321,6 @@ void
 ld_exit(
 int exit_value)
 {
-	if(exit_value != 0 && talking_to_ProjectBuilder)
-	    tell_ProjectBuilder("Link errors");
 	exit(exit_value);
 }
 
@@ -3449,7 +3359,7 @@ int sig)
  * allocate() is just a wrapper around malloc that prints and error message and
  * exits if the malloc fails.
  */
-extern
+__private_extern__
 void *
 allocate(
 unsigned long size)
@@ -3467,7 +3377,7 @@ unsigned long size)
  * reallocate() is just a wrapper around realloc that prints and error message
  * and exits if the realloc fails.
  */
-extern
+__private_extern__
 void *
 reallocate(
 void *p,
@@ -3484,7 +3394,7 @@ unsigned long size)
  * savestr() malloc's space for the string passed to it, copys the string into
  * the space and returns a pointer to that space.
  */
-extern
+__private_extern__
 char *
 savestr(
 const char *s)
@@ -3542,11 +3452,11 @@ const char *args,
 #endif /* !defined(RLD) */
 
 /*
- * round() rounds v to a multiple of r.
+ * rnd() rounds v to a multiple of r.
  */
-extern
+__private_extern__
 unsigned long
-round(
+rnd(
 unsigned long v,
 unsigned long r)
 {
@@ -3561,7 +3471,7 @@ unsigned long r)
 /*
  * All printing of all messages goes through this function.
  */
-extern
+__private_extern__
 void
 vprint(
 const char *format,
@@ -3577,7 +3487,7 @@ va_list ap)
 /*
  * The print function that just calls the above vprint() function.
  */
-extern
+__private_extern__
 void
 print(
 const char *format,
@@ -3593,7 +3503,7 @@ const char *format,
 /*
  * The ld_trace function that logs things for B&I.
  */
-extern
+__private_extern__
 void
 ld_trace(
 const char *format,
@@ -3654,7 +3564,7 @@ print_architecture_banner(void)
 /*
  * Print the warning message.  This is non-fatal and does not set 'errors'.
  */
-extern
+__private_extern__
 void
 warning(
 const char *format,
@@ -3676,7 +3586,7 @@ const char *format,
 /*
  * Print the error message and set the 'error' indication.
  */
-extern
+__private_extern__
 void
 error(
 const char *format,
@@ -3697,7 +3607,7 @@ const char *format,
 /*
  * Print the fatal error message, and exit non-zero.
  */
-extern
+__private_extern__
 void
 fatal(
 const char *format,
@@ -3718,7 +3628,7 @@ const char *format,
 /*
  * Print the current object file name and warning message.
  */
-extern
+__private_extern__
 void
 warning_with_cur_obj(
 const char *format,
@@ -3742,7 +3652,7 @@ const char *format,
  * Print the current object file name and error message, set the non-fatal
  * error indication.
  */
-extern
+__private_extern__
 void
 error_with_cur_obj(
 const char *format,
@@ -3765,7 +3675,7 @@ const char *format,
 /*
  * Print the warning message along with the system error message.
  */
-extern
+__private_extern__
 void
 system_warning(
 const char *format,
@@ -3788,7 +3698,7 @@ const char *format,
  * Print the error message along with the system error message, set the
  * non-fatal error indication.
  */
-extern
+__private_extern__
 void
 system_error(
 const char *format,
@@ -3812,7 +3722,7 @@ const char *format,
  * Print the fatal message along with the system error message, and exit
  * non-zero.
  */
-extern
+__private_extern__
 void
 system_fatal(
 const char *format,
@@ -3837,7 +3747,7 @@ const char *format,
  * Print the fatal error message along with the mach error string, and exit
  * non-zero.
  */
-extern
+__private_extern__
 void
 mach_fatal(
 kern_return_t r,

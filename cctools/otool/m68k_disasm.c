@@ -1,23 +1,31 @@
 /*
- * Copyright (c) 1999 Apple Computer, Inc. All rights reserved.
+ * Copyright © 2009 Apple Inc. All rights reserved.
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
- * This file contains Original Code and/or Modifications of Original Code
- * as defined in and that are subject to the Apple Public Source License
- * Version 2.0 (the 'License'). You may not use this file except in
- * compliance with the License. Please obtain a copy of the License at
- * http://www.opensource.apple.com/apsl/ and read it before using this
- * file.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  * 
- * The Original Code and all software distributed under the License are
- * distributed on an 'AS IS' basis, WITHOUT WARRANTY OF ANY KIND, EITHER
- * EXPRESS OR IMPLIED, AND APPLE HEREBY DISCLAIMS ALL SUCH WARRANTIES,
- * INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE, QUIET ENJOYMENT OR NON-INFRINGEMENT.
- * Please see the License for the specific language governing rights and
- * limitations under the License.
+ * 1.  Redistributions of source code must retain the above copyright notice,
+ * this list of conditions and the following disclaimer. 
+ * 2.  Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution. 
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of its
+ * contributors may be used to endorse or promote products derived from this
+ * software without specific prior written permission. 
  * 
+ * THIS SOFTWARE IS PROVIDED BY APPLE AND ITS CONTRIBUTORS "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL APPLE OR ITS CONTRIBUTORS BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
  * @APPLE_LICENSE_HEADER_END@
  */
 #include <stdio.h>
@@ -26,6 +34,7 @@
 #include <mach-o/nlist.h>
 #include <mach-o/reloc.h>
 #include "stuff/bytesex.h"
+#include "dyld_bind_info.h"
 #include "ofile_print.h"
 #include "stuff/symbol.h"
 #include "otool.h"
@@ -61,19 +70,19 @@ if(swapped) \
     (f) = SWAP_FLOAT((f));
 
 #define GET_LONG(sect, left, length, swapped, l) \
-if((left) < sizeof(unsigned long)){ \
+if((left) < sizeof(uint32_t)){ \
     (l) = 0; \
     memcpy((char *)&(l), (sect) + (length), (left)); \
     (length) += (left); \
     (left) = 0; \
 } \
 else{ \
-    memcpy((char *)&(l), (sect) + (length), sizeof(unsigned long)); \
-    (length) += sizeof(unsigned long); \
-    (left) -= sizeof(unsigned long); \
+    memcpy((char *)&(l), (sect) + (length), sizeof(uint32_t)); \
+    (length) += sizeof(uint32_t); \
+    (left) -= sizeof(uint32_t); \
 } \
 if(swapped) \
-    (l) = SWAP_LONG((l));
+    (l) = SWAP_INT((l));
 
 #define GET_WORD(sect, left, length, swapped, w) \
 if((left) < sizeof(unsigned short)){ \
@@ -138,8 +147,8 @@ static char *fpops[] = { "fmove", "fint", "fsinh", "fintrz", "fsqrt",
 };
 
 static char fpformat[] = "lsxpwdbp";
-static unsigned long fpsize[] = { L_SIZE, S_SIZE, X_SIZE, P_SIZE, W_SIZE,
-				  D_SIZE, B_SIZE, P_SIZE };
+static uint32_t fpsize[] = { L_SIZE, S_SIZE, X_SIZE, P_SIZE, W_SIZE,
+			     D_SIZE, B_SIZE, P_SIZE };
 static char *fpcond[] = { "f", "eq", "ogt", "oge", "olt", "ole", "ogl", "or",
 	"un", "ueq", "ugt", "uge", "ult", "ule", "ne", "t", "sf", "seq", "gt",
 	"ge", "lt", "le", "gl", "gle", "ngle", "ngl", "nle", "nlt", "nge",
@@ -163,51 +172,51 @@ static char *cache[] = { "dc", "ic", "bc" };
 		sorted_symbols, nsorted_symbols, strings, strings_size, \
 		verbose, swapped)
 
-static unsigned long print_ef(
-    unsigned long mode,
-    unsigned long reg,
+static uint32_t print_ef(
+    uint32_t mode,
+    uint32_t reg,
     char *sect,
-    unsigned long addr,
-    unsigned long sect_addr,
-    unsigned long *left,
-    unsigned long size,
+    uint32_t addr,
+    uint32_t sect_addr,
+    uint32_t *left,
+    uint32_t size,
     struct relocation_info *sorted_relocs,
-    unsigned long nsorted_relocs,
+    uint32_t nsorted_relocs,
     struct nlist *symbols,
-    unsigned long nsymbols,
+    uint32_t nsymbols,
     struct symbol *sorted_symbols,
-    unsigned long nsorted_symbols,
+    uint32_t nsorted_symbols,
     char *strings,
-    unsigned long strings_size,
+    uint32_t strings_size,
     enum bool verbose,
     enum bool swapped);
 
 
-unsigned long
+uint32_t
 m68k_disassemble(
 char *sect,
-unsigned long left,
-unsigned long addr,
-unsigned long sect_addr,
+uint32_t left,
+uint32_t addr,
+uint32_t sect_addr,
 enum byte_sex object_byte_sex,
 struct relocation_info *sorted_relocs,
-unsigned long nsorted_relocs,
+uint32_t nsorted_relocs,
 struct nlist *symbols,
-unsigned long nsymbols,
+uint32_t nsymbols,
 struct symbol *sorted_symbols,
-unsigned long nsorted_symbols,
+uint32_t nsorted_symbols,
 char *strings,
-unsigned long strings_size,
+uint32_t strings_size,
 uint32_t *indirect_symbols,
-unsigned long nindirect_symbols,
+uint32_t nindirect_symbols,
+struct load_command *load_commands,
 uint32_t ncmds,
 uint32_t sizeofcmds,
-struct load_command *load_commands,
 enum bool verbose)
 {
     enum byte_sex host_byte_sex;
     enum bool swapped;
-    unsigned long length, i, l;
+    uint32_t length, i, l;
     unsigned short opword, specop1, specop2, w;
     char *reg1, *reg2;
     const char *indirect_symbol_name;
@@ -402,7 +411,7 @@ enum bool verbose)
 		case 2:
 		    GET_LONG(sect, left, length, swapped, l);
 		    printf("subl\t");
-		    if(PRINT_SYMBOL(l, addr + length - sizeof(unsigned long)))
+		    if(PRINT_SYMBOL(l, addr + length - sizeof(uint32_t)))
 			printf(",");
 		    else
 			printf("#0x%x,", (unsigned int)l);
@@ -548,7 +557,7 @@ enum bool verbose)
 		case 2:
 		    printf("cmpl\t#");
 		    GET_LONG(sect, left, length, swapped, l);
-		    if(PRINT_SYMBOL(l, addr + length - sizeof(unsigned long)))
+		    if(PRINT_SYMBOL(l, addr + length - sizeof(uint32_t)))
 			printf(",");
 		    else
 			printf("0x%x,", (unsigned int)l);
@@ -1153,15 +1162,15 @@ enum bool verbose)
 	    printf("%s\t", branches[(opword & 0x0f00) >> 8]);
 	    if((opword & 0x00ff) == 0x00ff){
 		GET_LONG(sect, left, length, swapped, l);
-		if(PRINT_SYMBOL(addr + length - sizeof(unsigned long) + l,
-				addr + length - sizeof(unsigned long)))
+		if(PRINT_SYMBOL(addr + length - sizeof(uint32_t) + l,
+				addr + length - sizeof(uint32_t)))
 		    printf(":l\n");
 		else{
 		    printf("0x%x:l", (unsigned int)
-			   (addr + length - sizeof(unsigned long) + l));
+			   (addr + length - sizeof(uint32_t) + l));
 		    if(verbose){
 			indirect_symbol_name = guess_indirect_symbol(
-			   (addr + length - sizeof(unsigned long) + l),
+			   (addr + length - sizeof(uint32_t) + l),
 			    ncmds, sizeofcmds, load_commands, object_byte_sex,
 			    indirect_symbols, nindirect_symbols, symbols, NULL,
 			    nsymbols, strings, strings_size);
@@ -1191,11 +1200,11 @@ enum bool verbose)
 		    printf(":b\n");
 		else
 		    printf("0x%x:b\n", (unsigned int)
-			   (addr + length + (long)((char)(opword))));
+			   (addr + length + (int32_t)((char)(opword))));
 	    }
 	    return(length);
 	case 0x7:
-	    printf("moveq\t#%ld,%s\n", (long)((char)(opword)),
+	    printf("moveq\t#%u,%s\n", (int32_t)((char)(opword)),
 		   dregs[(opword >> 9) & 0x7]);
 	    return(length);
 	case 0x8:
@@ -1984,7 +1993,7 @@ enum bool verbose)
 				if((specop1 & 0x1000) == 0x1000){
 				    for(i = 0; i < 8; i++){
 					if((specop1 & 0x0080) != 0){
-					    printf("fp%lu", i);
+					    printf("fp%u", i);
 					    if(((specop1 << 1) & 0x00ff) != 0)
 						printf("/");
 					}
@@ -1995,7 +2004,7 @@ enum bool verbose)
 				    specop1 &= 0x00ff;
 				    for(i = 0; i < 8; i++){
 					if((specop1 & 1) != 0){
-					    printf("fp%lu", i);
+					    printf("fp%u", i);
 					    if((specop1 >> 1) != 0)
 						printf("/");
 					}
@@ -2018,7 +2027,7 @@ enum bool verbose)
 				if((specop1 & 0x1000) == 0x1000){
 				    for(i = 0; i < 8; i++){
 					if((specop1 & 0x0080) != 0){
-					    printf("fp%lu", i);
+					    printf("fp%u", i);
 					    if(((specop1 << 1) & 0x00ff) != 0)
 						printf("/");
 					}
@@ -2029,7 +2038,7 @@ enum bool verbose)
 				    specop1 &= 0x00ff;
 				    for(i = 0; i < 8; i++){
 					if((specop1 & 1) != 0){
-					    printf("fp%lu", i);
+					    printf("fp%u", i);
 					    if((specop1 >> 1) != 0)
 						printf("/");
 					}
@@ -2111,12 +2120,12 @@ enum bool verbose)
 		    goto bad;
 		printf("fb%s\t", fpcond[opword & 0x3f]);
 		GET_LONG(sect, left, length, swapped, l);
-		if(PRINT_SYMBOL(addr + length - sizeof(unsigned long) + l,
-				addr + length - sizeof(unsigned long)))
+		if(PRINT_SYMBOL(addr + length - sizeof(uint32_t) + l,
+				addr + length - sizeof(uint32_t)))
 		    printf(":l\n");
 		else
 		    printf("0x%x:l\n", (unsigned int)
-			   (addr + length - sizeof(unsigned long) + l));
+			   (addr + length - sizeof(uint32_t) + l));
 		return(length);
 	    case 4:
 		printf("fsave\t");
@@ -2198,27 +2207,27 @@ union extension {
  * immediate data for the #<data> addressing mode (B_SIZE == byte, etc).
  */
 static
-unsigned long
+uint32_t
 print_ef(
-unsigned long mode,
-unsigned long reg,
+uint32_t mode,
+uint32_t reg,
 char *sect,
-unsigned long addr,
-unsigned long sect_addr,
-unsigned long *left,
-unsigned long size,
+uint32_t addr,
+uint32_t sect_addr,
+uint32_t *left,
+uint32_t size,
 struct relocation_info *sorted_relocs,
-unsigned long nsorted_relocs,
+uint32_t nsorted_relocs,
 struct nlist *symbols,
-unsigned long nsymbols,
+uint32_t nsymbols,
 struct symbol *sorted_symbols,
-unsigned long nsorted_symbols,
+uint32_t nsorted_symbols,
 char *strings,
-unsigned long strings_size,
+uint32_t strings_size,
 enum bool verbose,
 enum bool swapped)
 {
-    unsigned long length, bd, od, l, x0, x1, x2, bd_addr, od_addr;
+    uint32_t length, bd, od, l, x0, x1, x2, bd_addr, od_addr;
     unsigned short w;
     union extension ext;
     char *base, *index, *scale, bd_size, od_size;
@@ -2254,7 +2263,7 @@ enum bool swapped)
 	    switch(reg){
 	    case 0:
 		GET_WORD(sect, *left, length, swapped, w);
-		l = (unsigned long)(w & 0xffff);
+		l = (uint32_t)(w & 0xffff);
 		if(PRINT_SYMBOL(l, addr) == TRUE)
 		    printf(":w");
 		else
@@ -2277,7 +2286,7 @@ enum bool swapped)
 		if(size == B_SIZE){
 		    printf("#");
 		    GET_WORD(sect, *left, length, swapped, w);
-		    l = (unsigned long)(w & 0xff);
+		    l = (uint32_t)(w & 0xff);
 		    if(PRINT_SYMBOL(l, addr) == TRUE)
 			printf(":b");
 		    else
@@ -2287,7 +2296,7 @@ enum bool swapped)
 		else if(size == W_SIZE){
 		    printf("#");
 		    GET_WORD(sect, *left, length, swapped, w);
-		    l = (unsigned long)(w & 0xffff);
+		    l = (uint32_t)(w & 0xffff);
 		    if(PRINT_SYMBOL(l, addr) == TRUE)
 			printf(":w");
 		    else
@@ -2314,23 +2323,23 @@ enum bool swapped)
 		    return(length);
 		}
 		else if(size == X_SIZE){
-		    if(*left < sizeof(unsigned long) * 3){
+		    if(*left < sizeof(uint32_t) * 3){
 			x0 = 0;
 			x1 = 0;
 			x2 = 0;
-			if(*left < sizeof(unsigned long)){
+			if(*left < sizeof(uint32_t)){
 			    memcpy((char *)&x0, sect + length, *left);
 			}
-			else if(*left < sizeof(unsigned long) * 2){
+			else if(*left < sizeof(uint32_t) * 2){
 			    memcpy((char *)&x0, sect + length,
-				   sizeof(unsigned long));
+				   sizeof(uint32_t));
 			    memcpy((char *)&x1, sect + length + 4, *left);
 			}
 			else{
 			    memcpy((char *)&x0, sect + length,
-				   sizeof(unsigned long));
+				   sizeof(uint32_t));
 			    memcpy((char *)&x1, sect + length + 4,
-				   sizeof(unsigned long));
+				   sizeof(uint32_t));
 			    memcpy((char *)&x2, sect + length + 8, *left);
 			}
 			length += *left;
@@ -2338,41 +2347,41 @@ enum bool swapped)
 		    }
 		    else{
 			memcpy((char *)&x0, sect + length,
-			       sizeof(unsigned long));
+			       sizeof(uint32_t));
 			memcpy((char *)&x1, sect + length + 4,
-			       sizeof(unsigned long));
+			       sizeof(uint32_t));
 			memcpy((char *)&x2, sect + length + 8,
-			       sizeof(unsigned long));
-			length += sizeof(unsigned long) * 3;
-			*left -= sizeof(unsigned long) * 3;
+			       sizeof(uint32_t));
+			length += sizeof(uint32_t) * 3;
+			*left -= sizeof(uint32_t) * 3;
 		    }
 		    if(swapped){
-			x0 = SWAP_LONG(x0);
-			x1 = SWAP_LONG(x1);
-			x2 = SWAP_LONG(x2);
+			x0 = SWAP_INT(x0);
+			x1 = SWAP_INT(x1);
+			x2 = SWAP_INT(x2);
 		    }
 		    printf("#0b%08x%08x%08x", (unsigned int)x0,
 			   (unsigned int)x1, (unsigned int)x2);
 		    return(length);
 		}
 		else if(size == P_SIZE){
-		    if(*left < sizeof(unsigned long) * 3){
+		    if(*left < sizeof(uint32_t) * 3){
 			x0 = 0;
 			x1 = 0;
 			x2 = 0;
-			if(*left < sizeof(unsigned long)){
+			if(*left < sizeof(uint32_t)){
 			    memcpy((char *)&x0, sect + length, *left);
 			}
-			else if(*left < sizeof(unsigned long) * 2){
+			else if(*left < sizeof(uint32_t) * 2){
 			    memcpy((char *)&x0, sect + length,
-				   sizeof(unsigned long));
+				   sizeof(uint32_t));
 			    memcpy((char *)&x1, sect + length + 4, *left);
 			}
 			else{
 			    memcpy((char *)&x0, sect + length,
-				   sizeof(unsigned long));
+				   sizeof(uint32_t));
 			    memcpy((char *)&x1, sect + length + 4,
-				   sizeof(unsigned long));
+				   sizeof(uint32_t));
 			    memcpy((char *)&x2, sect + length + 8, *left);
 			}
 			length += *left;
@@ -2380,18 +2389,18 @@ enum bool swapped)
 		    }
 		    else{
 			memcpy((char *)&x0, sect + length,
-			       sizeof(unsigned long));
+			       sizeof(uint32_t));
 			memcpy((char *)&x1, sect + length + 4,
-			       sizeof(unsigned long));
+			       sizeof(uint32_t));
 			memcpy((char *)&x2, sect + length + 8,
-			       sizeof(unsigned long));
-			length += sizeof(unsigned long) * 3;
-			*left -= sizeof(unsigned long) * 3;
+			       sizeof(uint32_t));
+			length += sizeof(uint32_t) * 3;
+			*left -= sizeof(uint32_t) * 3;
 		    }
 		    if(swapped){
-			x0 = SWAP_LONG(x0);
-			x1 = SWAP_LONG(x1);
-			x2 = SWAP_LONG(x2);
+			x0 = SWAP_INT(x0);
+			x1 = SWAP_INT(x1);
+			x2 = SWAP_INT(x2);
 		    }
 		    if(x0 & 0x80000000)
 			printf("#-%c.", (char)((x0 & 0xf) + '0'));

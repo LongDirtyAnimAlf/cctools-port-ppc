@@ -222,34 +222,7 @@ unsigned long reloc_index)
 	    pair_r_type = (enum reloc_type_arm)0;
 	    pair_reloc = NULL;
 	    spair_reloc = NULL;
-	    if(r_type == ARM_RELOC_OI12) {
-		if(i + 1 < section_map->s->nreloc){
-		    pair_reloc = relocs + i + 1;
-		    if((pair_reloc->r_address & R_SCATTERED) != 0){
-			spair_reloc = (struct scattered_relocation_info *)
-				      pair_reloc;
-			pair_reloc  = NULL;
-			pair_r_type = (enum reloc_type_arm)
-				      spair_reloc->r_type;
-			other_half  = spair_reloc->r_address;
-		    }
-		    else{
-			pair_r_type = (enum reloc_type_arm)
-				      pair_reloc->r_type;
-			other_half  = pair_reloc->r_address;
-		    }
-		}
-		if((pair_reloc == NULL && spair_reloc == NULL) ||
-		   pair_r_type != ARM_RELOC_PAIR){
-		    error_with_cur_obj("relocation entry (%lu) in section "
-			"(%.16s,%.16s) missing following associated "
-			"ARM_RELOC_PAIR entry", i, section_map->s->segname,
-			section_map->s->sectname);
-		    continue;
-		}
-	    }
-	    else if(r_type == ARM_RELOC_SECTDIFF ||
-	       r_type == ARM_RELOC_OI12_SECTDIFF ||
+	    if(r_type == ARM_RELOC_SECTDIFF ||
 	       r_type == ARM_RELOC_LOCAL_SECTDIFF){
 		if(r_scattered != 1){
 		    error_with_cur_obj("relocation entry (%lu) in section "
@@ -557,7 +530,6 @@ unsigned long reloc_index)
 		    local_map->output_section->referenced = TRUE;
 		    pair_local_map = NULL;
 		    if(r_type == ARM_RELOC_SECTDIFF ||
-		       r_type == ARM_RELOC_OI12_SECTDIFF ||
 		       r_type == ARM_RELOC_LOCAL_SECTDIFF){
 			pair_local_map =
 			    &(cur_obj->section_maps[pair_r_symbolnum - 1]);
@@ -567,7 +539,6 @@ unsigned long reloc_index)
 		       (pair_local_map == NULL ||
 			pair_local_map->nfine_relocs == 0) ){
 			if(r_type == ARM_RELOC_SECTDIFF ||
-			   r_type == ARM_RELOC_OI12_SECTDIFF ||
 			   r_type == ARM_RELOC_LOCAL_SECTDIFF){
 			    value = - local_map->s->addr
 				    + (local_map->output_section->s.addr +
@@ -685,7 +656,6 @@ unsigned long reloc_index)
 			    }
 			}
 			if(r_type == ARM_RELOC_SECTDIFF ||
-			   r_type == ARM_RELOC_OI12_SECTDIFF ||
 			   r_type == ARM_RELOC_LOCAL_SECTDIFF){
 			    /*
 			     * For ARM_RELOC_SECTDIFF's the item to be
@@ -953,9 +923,9 @@ unsigned long reloc_index)
 					      (value & 0xffe) << 15;
 				break;
 			    default:
-				error_with_cur_obj("r_type field (%u) of "
+				error_with_cur_obj("r_type field of "
 				    "relocation entry %lu in section (%.16s,"
-				    "%.16s) invalid", r_type, i,
+				    "%.16s) invalid", i,
 				    section_map->s->segname,
 				    section_map->s->sectname);
 				return;
@@ -1187,16 +1157,11 @@ unsigned long reloc_index)
 				  (immediate & 0x7ff000) >> 12 |
 				  (immediate & 0xffe) << 15;
 		    break;
-		case ARM_RELOC_OI12_SECTDIFF:
-                    immediate = (instruction & 0xfff);
-                    immediate += value;
-                    if (immediate > 0xfff)
-                        error_with_cur_obj("relocation is massive. frown.");
-                    instruction = (instruction & ~0xfff) | immediate;
-                    break;
+		case ARM_THUMB_32BIT_BRANCH:
+		    break;
 		default:
-		    error_with_cur_obj("r_type field (%u) of relocation entry %lu "
-			"in section (%.16s,%.16s) invalid", r_type, i,
+		    error_with_cur_obj("r_type field of relocation entry %lu "
+			"in section (%.16s,%.16s) invalid", i,
 			section_map->s->segname, section_map->s->sectname);
 		    continue;
 		}
@@ -1411,7 +1376,6 @@ update_reloc:
 		    }
 		    else if(spair_reloc != NULL){
 			if(r_type == ARM_RELOC_SECTDIFF ||
-			   r_type == ARM_RELOC_OI12_SECTDIFF ||
 			   r_type == ARM_RELOC_LOCAL_SECTDIFF){
 			    /*
 			     * For ARM_RELOC_SECTDIFF relocation entries (which
@@ -1428,8 +1392,6 @@ update_reloc:
 				    fine_reloc_output_address(pair_local_map,
 					pair_r_value - pair_local_map->s->addr,
 					pair_local_map->output_section->s.addr);
-			    if(r_type == ARM_RELOC_OI12_SECTDIFF)
-				spair_reloc->r_address = other_half;
 			}
 		    }
 		    else{

@@ -27,7 +27,7 @@
 #include <sys/stat.h>
 #include "stuff/errors.h"
 #include "stuff/breakout.h"
-#include "stuff/round.h"
+#include "stuff/rnd.h"
 
 /* used by error routines as the name of the program */
 char *progname = NULL;
@@ -39,12 +39,16 @@ static void usage(
 
 static void process(
     struct arch *archs,
-    unsigned long narchs);
+    uint32_t narchs);
 
 static void hack_seg(
     struct object *object,
     struct load_command *lc,
     struct segment_command *sg);
+
+/* apple_version is created by the libstuff/Makefile */
+extern char apple_version[];
+char *version = apple_version;
 
 /*
  * The seg_hack(1) program changes all segments names to the one specified on
@@ -61,7 +65,7 @@ char **envp)
     int i;
     char *input, *output;
     struct arch *archs;
-    unsigned long narchs;
+    uint32_t narchs;
     struct stat stat_buf;
 
 	progname = argv[0];
@@ -109,7 +113,7 @@ char **envp)
 	if(stat(input, &stat_buf) == -1)
 	    system_error("can't stat input file: %s", input);
 	writeout(archs, narchs, output, stat_buf.st_mode & 0777,
-		     TRUE, FALSE, FALSE, NULL);
+		     TRUE, FALSE, FALSE, FALSE, NULL);
 
 	if(errors)
 	    return(EXIT_FAILURE);
@@ -133,12 +137,14 @@ static
 void
 process(
 struct arch *archs,
-unsigned long narchs)
+uint32_t narchs)
 {
-    unsigned long i, j, k, offset, size;
+    uint32_t i, j, k, offset, size;
     struct object *object;
     struct load_command *lc;
     struct segment_command *sg;
+    struct ar_hdr h;
+    char size_buf[sizeof(h.ar_size) + 1];
 
 	for(i = 0; i < narchs; i++){
 	    if(archs[i].type == OFILE_ARCHIVE){
@@ -190,7 +196,7 @@ unsigned long narchs)
 		    archs[i].members[j].offset = offset;
 		    size = 0;
 		    if(archs[i].members[j].member_long_name == TRUE){
-			size = round(archs[i].members[j].member_name_size,
+			size = rnd(archs[i].members[j].member_name_size,
 				     sizeof(long));
 			archs[i].toc_long_name = TRUE;
 		    }
@@ -198,15 +204,15 @@ unsigned long narchs)
 			size += archs[i].members[j].object->object_size
 			   - archs[i].members[j].object->input_sym_info_size
 			   + archs[i].members[j].object->output_sym_info_size;
-			sprintf(archs[i].members[j].ar_hdr->ar_size, "%-*ld",
-			       (int)sizeof(archs[i].members[j].ar_hdr->ar_size),
-			       (long)(size));
+			sprintf(size_buf, "%-*ld",
+			   (int)sizeof(archs[i].members[j].ar_hdr->ar_size),
+			   (long)(size));
 			/*
 			 * This has to be done by hand because sprintf puts a
 			 * null at the end of the buffer.
 			 */
-			memcpy(archs[i].members[j].ar_hdr->ar_fmag, ARFMAG,
-			      (int)sizeof(archs[i].members[j].ar_hdr->ar_fmag));
+			memcpy(archs[i].members[j].ar_hdr->ar_size, size_buf,
+			   (int)sizeof(archs[i].members[j].ar_hdr->ar_size));
 		    }
 		    else{
 			size += archs[i].members[j].unknown_size;
@@ -274,7 +280,7 @@ struct load_command *lc,
 struct segment_command *sg)
 {
     struct section *s;
-    unsigned long i;
+    uint32_t i;
 
 	if(strcmp(sg->segname, SEG_PAGEZERO) != 0 &&
 	   strcmp(sg->segname, SEG_LINKEDIT) != 0){

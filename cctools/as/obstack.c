@@ -16,6 +16,7 @@ along with this program; if not, write to the Free Software
 Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
 
 #include <stdlib.h>
+#include <stdint.h> /* cctools-port */
 #include "obstack.h"
 
 #ifdef __STDC__
@@ -30,7 +31,7 @@ struct fooalign {char x; double d;};
 /* If malloc were really smart, it would round addresses to DEFAULT_ALIGNMENT.
    But in fact it might be less smart and round addresses to as much as
    DEFAULT_ROUNDING.  So we prepare for it to do that.  */
-union fooround {long x; double d;};
+union fooround {int32_t x; double d;};
 #define DEFAULT_ROUNDING (sizeof (union fooround))
 
 /* When we copy a long block of data, this is the unit to do it with.
@@ -56,7 +57,7 @@ _obstack_begin(
 struct obstack *h,
 int size,
 int alignment,
-void *(*chunkfun)(long n),
+void *(*chunkfun)(size_t n),
 void (*freefun)() )
 {
   register struct _obstack_chunk* chunk; /* points to new chunk */
@@ -105,7 +106,7 @@ int length)
 {
   register struct _obstack_chunk*	old_chunk = h->chunk;
   register struct _obstack_chunk*	new_chunk;
-  register long	new_size;
+  register int32_t	new_size;
   register int obj_size = h->next_free - h->object_base;
   register int i;
   int already;

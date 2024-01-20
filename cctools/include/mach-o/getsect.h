@@ -26,6 +26,10 @@
 #include <stdint.h>
 #include <mach-o/loader.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /*
  * Runtime interfaces for Mach-O programs.  For both 32-bit and 64-bit programs,
  * where the sizes returned will be 32-bit or 64-bit based on the size of
@@ -54,8 +58,19 @@ extern const struct section *getsectbyname(
     const char *segname,
     const char *sectname);
 
+extern uint8_t *getsectiondata(
+    const struct mach_header *mhp,
+    const char *segname,
+    const char *sectname,
+    unsigned long *size);
+
 extern const struct segment_command *getsegbyname(
     const char *segname);
+
+extern uint8_t *getsegmentdata(
+    const struct mach_header *mhp,
+    const char *segname,
+    unsigned long *size);
 
 #else /* defined(__LP64__) */
 /*
@@ -65,8 +80,19 @@ extern const struct section_64 *getsectbyname(
     const char *segname,
     const char *sectname);
 
+extern uint8_t *getsectiondata(
+    const struct mach_header_64 *mhp,
+    const char *segname,
+    const char *sectname,
+    unsigned long *size);
+
 extern const struct segment_command_64 *getsegbyname(
     const char *segname);
+
+extern uint8_t *getsegmentdata(
+    const struct mach_header_64 *mhp,
+    const char *segname,
+    unsigned long *size);
 
 #endif /* defined(__LP64__) */
 
@@ -84,6 +110,12 @@ extern const struct section *getsectbynamefromheader(
     const char *segname,
     const char *sectname);
 
+extern const struct section *getsectbynamefromheaderwithswap(
+    struct mach_header *mhp,
+    const char *segname,
+    const char *sectname,
+    int fSwap);
+
 /*
  * Interfaces for tools working with 64-bit Mach-O files.
  */
@@ -97,5 +129,15 @@ extern const struct section_64 *getsectbynamefromheader_64(
     const struct mach_header_64 *mhp,
     const char *segname,
     const char *sectname);
+
+extern const struct section *getsectbynamefromheaderwithswap_64(
+    struct mach_header_64 *mhp,
+    const char *segname,
+    const char *sectname,
+    int fSwap);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _MACH_O_GETSECT_H_ */

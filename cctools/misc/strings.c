@@ -74,6 +74,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <limits.h>
+#include <sys/types.h>
 #include <sys/stat.h>
 #include "stuff/bool.h"
 #include "stuff/ofile.h"
@@ -87,7 +88,7 @@ struct flags {
     enum bool print_offsets;
     char *offset_format;
     enum bool all_sections;
-    unsigned long minimum_length;
+    uint32_t minimum_length;
 };
 
 static void usage(
@@ -98,14 +99,18 @@ static void ofile_processor(
     void *cookie);
 static void ofile_find(
     char *addr,
-    unsigned long size,
-    unsigned long offset,
+    uint32_t size,
+    uint32_t offset,
     struct flags *flags);
 static void find(
-    unsigned long cnt,
+    uint32_t cnt,
     struct flags *flags);
 static enum bool dirt(
     int c);
+
+/* apple_version is created by the libstuff/Makefile */
+extern char apple_version[];
+char *version = apple_version;
 
 int
 main(
@@ -115,10 +120,10 @@ char **envp)
 {
     struct flags flags;
     int i;
-    unsigned long j, nfiles;
+    uint32_t j, nfiles;
     char *endp;
     struct arch_flag *arch_flags;
-    unsigned long narch_flags;
+    uint32_t narch_flags;
     enum bool all_archs, rest_args_files, use_member_syntax;
     struct stat stat_buf;
 
@@ -249,7 +254,7 @@ char **envp)
 			if(freopen(argv[i], "r", stdin) == NULL)
 			    system_error("can't open: %s", argv[i]);
 			rewind(stdin);
-			find(ULONG_MAX, &flags);
+			find(UINT_MAX, &flags);
 		    }
 		    else{
 			/*
@@ -274,7 +279,7 @@ char **envp)
 	    }
 	}
 	else{
-	    find(ULONG_MAX, &flags);
+	    find(UINT_MAX, &flags);
 	}
 	if(errors == 0)
 	    return(EXIT_SUCCESS);
@@ -314,7 +319,8 @@ char *arch_name,
 void *cookie)
 {
     char *addr;
-    unsigned long offset, size, i, j;
+    uint64_t offset, size;
+    uint32_t i, j;
     uint32_t ncmds;
     struct flags *flags;
     struct load_command *lc;
@@ -329,24 +335,41 @@ void *cookie)
 	 * If the ofile is not an object file then process it without reguard
 	 * to sections.
 	 */
-	if(ofile->object_addr == NULL){
+	if(ofile->object_addr == NULL
+#ifdef LTO_SUPPORT /* cctools-port */
+		|| ofile->member_type == OFILE_LLVM_BITCODE
+#endif /* LTO_SUPPORT */
+	  )
+	{
 	    if(ofile->file_type == OFILE_FAT && ofile->arch_flag.cputype != 0){
-		addr = ofile->file_addr + ofile->fat_archs[ofile->narch].offset;
-		size = ofile->fat_archs[ofile->narch].size;
-		offset = ofile->fat_archs[ofile->narch].offset;
+		if(ofile->fat_header->magic == FAT_MAGIC_64){
+		    addr = ofile->file_addr +
+			   ofile->fat_archs64[ofile->narch].offset;
+		    size = ofile->fat_archs64[ofile->narch].size;
+		    offset = ofile->fat_archs64[ofile->narch].offset;
+		}
+		else{
+		    addr = ofile->file_addr +
+			   ofile->fat_archs[ofile->narch].offset;
+		    size = ofile->fat_archs[ofile->narch].size;
+		    offset = ofile->fat_archs[ofile->narch].offset;
+		}
 	    }
 	    else{
 		addr = ofile->file_addr;
 		size = ofile->file_size;
 		offset = 0;
 	    }
-	    if(ofile->member_ar_hdr != NULL)
-		ofile_find(addr + ofile->member_offset,
-			   strtoul(ofile->member_ar_hdr->ar_size, NULL, 10),
-			   offset + ofile->member_offset,
-			   flags);
-	    else
-		ofile_find(addr, size, offset, flags);
+	    if(ofile->member_ar_hdr != NULL) {
+		addr = addr + ofile->member_offset;
+		size = strtoul(ofile->member_ar_hdr->ar_size, NULL, 10);
+		offset = offset + ofile->member_offset;
+	    }
+	    if(offset >= ofile->file_size)
+		size = 0;
+	    else if(offset + size > ofile->file_size)
+		size = ofile->file_size - offset;
+	    ofile_find(addr, size, offset, flags);
 	    return;
 	}
 
@@ -365,17 +388,33 @@ void *cookie)
 			sizeof(struct segment_command));
 		for(j = 0; j < sg->nsects; j++){
 		    if(flags->all_sections){
-			if((s->flags & S_ZEROFILL) != S_ZEROFILL){
-			    ofile_find(ofile->object_addr + s->offset,
-				       s->size, s->offset, flags);
+			if((s->flags & S_ZEROFILL) != S_ZEROFILL &&
+			   (s->flags & S_THREAD_LOCAL_ZEROFILL) !=
+				       S_THREAD_LOCAL_ZEROFILL){
+			    addr = ofile->object_addr + s->offset;
+			    offset = s->offset;
+			    size = s->size;
+			    if(offset >= ofile->file_size)
+				size = 0;
+			    else if(offset + size > ofile->file_size)
+				size = ofile->file_size - offset;
+			    ofile_find(addr, size, offset, flags);
 			}
 		    }
 		    else{
 			if((s->flags & S_ZEROFILL) != S_ZEROFILL &&
+			   (s->flags & S_THREAD_LOCAL_ZEROFILL) !=
+				       S_THREAD_LOCAL_ZEROFILL &&
 			   (strcmp(s->sectname, SECT_TEXT) != 0 ||
 			    strcmp(s->segname, SEG_TEXT) != 0)){
-			    ofile_find(ofile->object_addr + s->offset,
-				       s->size, s->offset, flags);
+			    addr = ofile->object_addr + s->offset;
+			    offset = s->offset;
+			    size = s->size;
+			    if(offset >= ofile->file_size)
+				size = 0;
+			    else if(offset + size > ofile->file_size)
+				size = ofile->file_size - offset;
+			    ofile_find(addr, size, offset, flags);
 			}
 		    }
 		    s++;
@@ -387,17 +426,33 @@ void *cookie)
 			sizeof(struct segment_command_64));
 		for(j = 0; j < sg64->nsects; j++){
 		    if(flags->all_sections){
-			if((s64->flags & S_ZEROFILL) != S_ZEROFILL){
-			    ofile_find(ofile->object_addr + s64->offset,
-				       s64->size, s64->offset, flags);
+			if((s64->flags & S_ZEROFILL) != S_ZEROFILL &&
+			   (s64->flags & S_THREAD_LOCAL_ZEROFILL) != 
+				         S_THREAD_LOCAL_ZEROFILL){
+			    addr = ofile->object_addr + s64->offset;
+			    offset = s64->offset;
+			    size = s64->size;
+			    if(offset >= ofile->file_size)
+				size = 0;
+			    else if(offset + size > ofile->file_size)
+				size = ofile->file_size - offset;
+			    ofile_find(addr, size, offset, flags);
 			}
 		    }
 		    else{
 			if((s64->flags & S_ZEROFILL) != S_ZEROFILL &&
+			   (s64->flags & S_THREAD_LOCAL_ZEROFILL) !=
+					 S_THREAD_LOCAL_ZEROFILL &&
 			   (strcmp(s64->sectname, SECT_TEXT) != 0 ||
 			    strcmp(s64->segname, SEG_TEXT) != 0)){
-			    ofile_find(ofile->object_addr + s64->offset,
-				       s64->size, s64->offset, flags);
+			    addr = ofile->object_addr + s64->offset;
+			    offset = s64->offset;
+			    size = s64->size;
+			    if(offset >= ofile->file_size)
+				size = 0;
+			    else if(offset + size > ofile->file_size)
+				size = ofile->file_size - offset;
+			    ofile_find(addr, size, offset, flags);
 			}
 		    }
 		    s64++;
@@ -416,11 +471,11 @@ static
 void
 ofile_find(
 char *addr,
-unsigned long size,
-unsigned long offset,
+uint32_t size,
+uint32_t offset,
 struct flags *flags)
 {
-    unsigned long i, string_length;
+    uint32_t i, string_length;
     char c, *string;
 
 	string = addr;
@@ -454,7 +509,7 @@ struct flags *flags)
 static
 void
 find(
-unsigned long cnt,
+uint32_t cnt,
 struct flags *flags)
 {
     static char buf[BUFSIZ];

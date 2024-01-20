@@ -51,22 +51,21 @@
 #include "stuff/openstep_mach.h"
 #include <mach-o/fat.h>
 #include <mach-o/loader.h>
-#include <mach/m68k/thread_status.h>
+#import <mach/m68k/thread_status.h>
 #undef MACHINE_THREAD_STATE	/* need to undef these to avoid warnings */
 #undef MACHINE_THREAD_STATE_COUNT
 #undef THREAD_STATE_NONE
 #undef VALID_THREAD_STATE_FLAVOR
-#include <mach/ppc/thread_status.h>
+#import <mach/ppc/thread_status.h>
 #undef MACHINE_THREAD_STATE	/* need to undef these to avoid warnings */
 #undef MACHINE_THREAD_STATE_COUNT
 #undef THREAD_STATE_NONE
 #undef VALID_THREAD_STATE_FLAVOR
-#include <mach/m88k/thread_status.h>
-#include <mach/i860/thread_status.h>
-#include <mach/i386/thread_status.h>
-#include <mach/hppa/thread_status.h>
-#include <mach/sparc/thread_status.h>
-#include <mach/arm/thread_status.h>
+#import <mach/m88k/thread_status.h>
+#import <mach/i860/thread_status.h>
+#import <mach/i386/thread_status.h>
+#import <mach/hppa/thread_status.h>
+#import <mach/sparc/thread_status.h>
 #include <mach-o/nlist.h>
 #include <mach-o/reloc.h>
 #if defined(RLD) && !defined(SA_RLD) && !(defined(KLD) && defined(__STATIC__))
@@ -95,48 +94,48 @@
 #include "uuid.h"
 
 #ifdef RLD
-extern long RLD_DEBUG_OUTPUT_FILENAME_flag;
+__private_extern__ long RLD_DEBUG_OUTPUT_FILENAME_flag;
 #endif
 
 /* The output file's mach header */
-struct mach_header output_mach_header = { 0 };
+__private_extern__ struct mach_header output_mach_header = { 0 };
 
 /*
  * The output file's symbol table load command and the offsets used in the
  * second pass to output the symbol table and string table.
  */
-struct symtab_info output_symtab_info = { {0} };
+__private_extern__ struct symtab_info output_symtab_info = { {0} };
 
 /*
  * The output file's dynamic symbol table load command.
  */
-struct dysymtab_info output_dysymtab_info = { {0} };
+__private_extern__ struct dysymtab_info output_dysymtab_info = { {0} };
 
 /*
  * The output file's two level hints load command.
  */
-struct hints_info output_hints_info = { { 0 } };
+__private_extern__ struct hints_info output_hints_info = { { 0 } };
 
 /*
  * The output file's prebind_cksum load command.
  */
-struct cksum_info output_cksum_info = { { 0 } };
+__private_extern__ struct cksum_info output_cksum_info = { { 0 } };
 
 /*
- * The output file's prebind_cksum load command.
+ * The output file's UUID load command.
  */
-struct uuid_info output_uuid_info = { 0 };
+__private_extern__ struct uuid_info output_uuid_info = { 0 };
 
 /*
  * The output file's thread load command and the machine specific information
  * for it.
  */
-struct thread_info output_thread_info = { {0} };
+__private_extern__ struct thread_info output_thread_info = { {0} };
 
 /*
  * The output file's routines load command and the specific information for it.
  */
-struct routines_info output_routines_info = { {0} };
+__private_extern__ struct routines_info output_routines_info = { {0} };
 
 /*
  * The thread states that are currently known by this link editor.
@@ -152,13 +151,13 @@ static m88k_thread_state_grf_t mc88000 = { 0 };
 static struct i860_thread_state_regs i860 = { {0} };
 /* cputype == CPU_TYPE_I386, all cpusubtype's */
 static i386_thread_state_t intel386 = { 0 };
-/* cputype == CPU_TYPE_ARM, all subtypes */
-static arm_thread_state_t arm = { 0 };
 /* cputype == CPU_TYPE_HPPA, all cpusubtypes */
 static struct hp_pa_frame_thread_state hppa_frame_state = { 0 };
 static struct hp_pa_integer_thread_state hppa_integer_state = { 0 };
 /* cputype == CPU_TYPE_SPARC, all subtypes */
 static struct sparc_thread_state_regs sparc_state = { {0} };
+/* cputype == CPU_TYPE_ARM, all subtypes */
+static arm_thread_state_t arm_state = { {0} };
 
 static void layout_segments(void);
 static unsigned long next_vmaddr(
@@ -184,7 +183,7 @@ static void print_load_map_for_objects(struct merged_section *ms);
 /*
  * layout() is called from main() and lays out the output file.
  */
-extern
+__private_extern__
 void
 layout(void)
 {
@@ -202,7 +201,6 @@ layout(void)
 	memset(&powerpc,     '\0', sizeof(ppc_thread_state_t));
 	memset(&mc88000, '\0', sizeof(m88k_thread_state_grf_t));
 	memset(&intel386,'\0', sizeof(i386_thread_state_t));
-	memset(&arm,'\0', sizeof(arm_thread_state_t));
 	intel386.es = USER_DATA_SELECTOR;
 	intel386.ds = USER_DATA_SELECTOR;
 	intel386.ss = USER_DATA_SELECTOR;
@@ -413,7 +411,7 @@ layout(void)
  * output file.  This contains only a mach_header, a symtab load command the
  * symbol and string table for the current set of merged symbols.
  */
-extern
+__private_extern__
 void
 layout_rld_symfile(void)
 {
@@ -431,7 +429,7 @@ layout_rld_symfile(void)
 						sizeof(struct symtab_command);
 	output_symtab_info.symtab_command.nsyms = nmerged_symbols;
 	output_symtab_info.symtab_command.strsize =
-	    round(merged_string_size + STRING_SIZE_OFFSET,
+	    rnd(merged_string_size + STRING_SIZE_OFFSET,
 		  sizeof(unsigned long));
 	output_symtab_info.output_strpad =
 	    output_symtab_info.symtab_command.strsize -
@@ -748,7 +746,7 @@ layout_segments(void)
 			     + nlocal_symbols
 			     - nmerged_symbols_referenced_only_from_dylibs) *
 			    sizeof(struct nlist) +
-			    round(merged_string_size +
+			    rnd(merged_string_size +
 				  local_string_size +
 				  STRING_SIZE_OFFSET,
 				  sizeof(unsigned long));
@@ -762,7 +760,7 @@ layout_segments(void)
 			    output_hints_info.twolevel_hints_command.nhints *
 			    sizeof(struct twolevel_hint);
 		    linkedit_segment.sg.vmsize =
-				round(linkedit_segment.sg.filesize, segalign);
+				rnd(linkedit_segment.sg.filesize, segalign);
 		    /* place this last in the merged segment list */
 		    p = &merged_segments;
 		    while(*p){
@@ -815,7 +813,7 @@ layout_segments(void)
 		    pagezero_segment.prot_set = TRUE;
 		    strcpy(pagezero_segment.sg.segname, SEG_PAGEZERO);
 		    if(pagezero_size != 0)
-			pagezero_segment.sg.vmsize = round(pagezero_size,
+			pagezero_segment.sg.vmsize = rnd(pagezero_size,
 							   segalign);
 		    else
 			pagezero_segment.sg.vmsize = segalign;
@@ -922,7 +920,8 @@ layout_segments(void)
 			  (unsigned int)segalign);
 	    }
 	    else{
-		segs_read_write_addr = segs_read_only_addr + get_shared_region_sz_from_flag(&arch_flag);
+		segs_read_write_addr = segs_read_only_addr + 
+				   get_shared_region_size_from_flag(&arch_flag);
 	    }
 	}
 	first_msg = merged_segments;
@@ -1128,7 +1127,7 @@ layout_segments(void)
 		+ nlocal_symbols
 		- nmerged_symbols_referenced_only_from_dylibs;
 	    output_symtab_info.symtab_command.strsize =
-		round(merged_string_size +
+		rnd(merged_string_size +
 		      local_string_size +
 		      STRING_SIZE_OFFSET,
 		      sizeof(unsigned long));
@@ -1178,7 +1177,9 @@ layout_segments(void)
 	 * Create the uuid load command.
 	 */
 #ifndef KLD
-	if(output_uuid_info.suppress != TRUE && output_uuid_info.emit == TRUE){
+	if(output_uuid_info.suppress != TRUE &&
+	   (output_uuid_info.emit == TRUE ||
+	    arch_flag.cputype == CPU_TYPE_ARM)){
 	    output_uuid_info.uuid_command.cmd = LC_UUID;
 	    output_uuid_info.uuid_command.cmdsize = sizeof(struct uuid_command);
 	    uuid(&(output_uuid_info.uuid_command.uuid[0]));
@@ -1280,13 +1281,13 @@ layout_segments(void)
 		SPARC_THREAD_STATE_REGS_COUNT;
 	    }
 	    else if (arch_flag.cputype == CPU_TYPE_ARM) {
-		output_thread_info.flavor = ARM_THREAD_STATE;
-		output_thread_info.count = ARM_THREAD_STATE_COUNT;
-		output_thread_info.entry_point = &(arm.r15);
-		output_thread_info.stack_pointer = &(arm.r13);
-		output_thread_info.state = &arm;
-		output_thread_info.thread_command.cmdsize += sizeof(long) *
-					    ARM_THREAD_STATE_COUNT;
+	      output_thread_info.flavor = ARM_THREAD_STATE;
+	      output_thread_info.count = ARM_THREAD_STATE_COUNT;
+	      output_thread_info.entry_point = (int *)&(arm_state.__pc);
+	      output_thread_info.stack_pointer = (int *)&(arm_state.__sp);
+	      output_thread_info.state = &arm_state;
+	      output_thread_info.thread_command.cmdsize += sizeof(long) *
+		ARM_THREAD_STATE_COUNT;
 	    }
 	    else{
 		fatal("internal error: layout_segments() called with unknown "
@@ -1352,7 +1353,7 @@ layout_segments(void)
 	    headers_size = segalign;
 	}
 	else if(filetype == MH_DYLINKER){
-	    headers_size = round(headers_size, segalign);
+	    headers_size = rnd(headers_size, segalign);
 	}
 
 	/*
@@ -1377,16 +1378,16 @@ layout_segments(void)
 				  (unsigned int)(1 << ms->s.align),
 				  ms->s.segname, ms->s.sectname,
 				  (unsigned int)segalign);
-			size = round(size, 1 << ms->s.align);
+			size = rnd(size, 1 << ms->s.align);
 			if((unsigned long)(1 << ms->s.align) > max_first_align)
 			    max_first_align = 1 << ms->s.align;
 			size += ms->s.size;
 			content = &(ms->next);
 		    }
 		    if(errors == 0){
-			pad = ((round(size + round(headers_size,
+			pad = ((rnd(size + rnd(headers_size,
 				      max_first_align), segalign) -
-			       (size + round(headers_size, max_first_align))) /
+			       (size + rnd(headers_size, max_first_align))) /
 				 max_first_align) * max_first_align;
 			if(pad > headerpad)
 			    headerpad = pad;
@@ -1426,7 +1427,7 @@ layout_segments(void)
 			      ms->s.sectname, (unsigned int)segalign);
 		    if((unsigned long)(1 << ms->s.align) > max_align)
 			max_align = 1 << ms->s.align;
-		    addr = round(addr, 1 << ms->s.align);
+		    addr = rnd(addr, 1 << ms->s.align);
 		    ms->s.addr = addr;
 		    addr += ms->s.size;
 		    content = &(ms->next);
@@ -1434,7 +1435,7 @@ layout_segments(void)
 		if(msg == &object_segment)
 		    msg->sg.filesize = addr;
 		else
-		    msg->sg.filesize = round(addr, segalign);
+		    msg->sg.filesize = rnd(addr, segalign);
 		zerofill = &(msg->zerofill_sections);
 		while(*zerofill){
 		    ms = *zerofill;
@@ -1445,7 +1446,7 @@ layout_segments(void)
 			      ms->s.sectname, (unsigned int)segalign);
 		    if((unsigned long)(1 << ms->s.align) > max_align)
 			max_align = 1 << ms->s.align;
-		    addr = round(addr, 1 << ms->s.align);
+		    addr = rnd(addr, 1 << ms->s.align);
 		    ms->s.addr = addr;
 		    addr += ms->s.size;
 		    zerofill = &(ms->next);
@@ -1453,7 +1454,7 @@ layout_segments(void)
 		if(msg == &object_segment)
 		    msg->sg.vmsize = addr;
 		else
-		    msg->sg.vmsize = round(addr, segalign);
+		    msg->sg.vmsize = rnd(addr, segalign);
 	    }
 	    p = &(msg->next);
 	}
@@ -1467,7 +1468,7 @@ layout_segments(void)
 	 */
 	output_size = 0;
 
-	headers_size = round(headers_size, max_align);
+	headers_size = rnd(headers_size, max_align);
 	output_size = headers_size;
 	if(first_msg != NULL)
 	    output_size += first_msg->sg.vmsize;
@@ -1665,7 +1666,7 @@ layout_segments(void)
 	 * sizeof(long) so the offset must be rounded to this as the sections
 	 * and segments may not be rounded to this.
 	 */
-	offset = round(offset, sizeof(long));
+	offset = rnd(offset, sizeof(long));
 #ifdef RLD
 	/*
 	 * For RLD if there is any symbol table it is written past the size
@@ -1869,8 +1870,14 @@ layout_segments(void)
 		   merged_symbol->nlist.n_type == (N_EXT | N_UNDF))
 		    fatal("initialization routine symbol name: %s not defined",
 			  init_name);
-		output_routines_info.routines_command.init_address =
-		    merged_symbol->nlist.n_value;
+		if(arch_flag.cputype == CPU_TYPE_ARM &&
+		   (merged_symbol->nlist.n_desc & N_ARM_THUMB_DEF))
+		    /* Have to set the low-order bit if symbol is Thumb */
+		    output_routines_info.routines_command.init_address =
+			merged_symbol->nlist.n_value | 1;
+		else
+		    output_routines_info.routines_command.init_address =
+			merged_symbol->nlist.n_value;
 		output_routines_info.routines_command.init_module =
 		    merged_symbol->definition_object->imodtab;
 	    }
@@ -2496,7 +2503,7 @@ struct merged_section *ms)
 /*
  * print_mach_header() prints the output file's mach header.  For debugging.
  */
-extern
+__private_extern__
 void
 print_mach_header(void)
 {
@@ -2514,7 +2521,7 @@ print_mach_header(void)
  * print_symtab_info() prints the output file's symtab command.  For
  * debugging.
  */
-extern
+__private_extern__
 void
 print_symtab_info(void)
 {
@@ -2531,7 +2538,7 @@ print_symtab_info(void)
  * print_thread_info() prints the output file's thread information.  For
  * debugging.
  */
-extern
+__private_extern__
 void
 print_thread_info(void)
 {

@@ -23,7 +23,7 @@
 #ifndef _MACH_O_DYLD_H_
 #define _MACH_O_DYLD_H_
 
-#if __cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
 
@@ -239,7 +239,7 @@ extern long NSVersionOfLinkTimeLibrary(
     const char *libraryName);
 extern int _NSGetExecutablePath( /* SPI first appeared in Mac OS X 10.2 */
     char *buf,
-    unsigned long *bufsize);
+    uint32_t *bufsize);
 
 /*
  * The low level _dyld_... API.
@@ -316,11 +316,11 @@ extern void _dyld_lookup_and_bind_fully(
     unsigned long *address,
     void **module);
 
-extern int _dyld_func_lookup(
+__private_extern__ int _dyld_func_lookup(
     const char *dyld_func_name,
     unsigned long *address);
 
-#if __cplusplus
+#ifdef __cplusplus
 }
 #endif /* __cplusplus */
 

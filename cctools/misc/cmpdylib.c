@@ -20,13 +20,13 @@
  * 
  * @APPLE_LICENSE_HEADER_END@
  */
-#include <stdio.h>
-#include <stdlib.h>
+#import <stdio.h>
+#import <stdlib.h>
 
-#include "stuff/ofile.h"
-#include "stuff/errors.h"
-#include "stuff/bytesex.h"
-#include "stuff/allocate.h"
+#import "stuff/ofile.h"
+#import "stuff/errors.h"
+#import "stuff/bytesex.h"
+#import "stuff/allocate.h"
 
 /* name of the program for error messages (argv[0]) */
 __private_extern__ char *progname = NULL;
@@ -92,6 +92,10 @@ static int nlist_bsearch(
 static int nlist_bsearch64(
     const char *symbol_name,
     const struct nlist_64 *sym64);
+
+/* apple_version is created by the libstuff/Makefile */
+extern char apple_version[];
+char *version = apple_version;
 
 /*
  * The program cmpdylib.  This compares an old and an new dynamic shared library
@@ -174,7 +178,7 @@ struct ofile *new_ofile,
 char *arch_name,
 void *cookie)
 {
-    unsigned long i;
+    uint32_t i;
     struct load_command *lc;
     struct ofile *old_ofile;
     struct dylib_command *old_dl, *new_dl;
@@ -337,7 +341,7 @@ struct ofile *old_ofile,
 char *arch_name,
 enum bool new_api_allowed)
 {
-    unsigned long i;
+    uint32_t i;
     struct load_command *lc;
     enum bool new_api, missing_symbols, found;
 
@@ -408,10 +412,10 @@ enum bool new_api_allowed)
 		if(arch_name != NULL)
 		    fatal("malformed dynamic shared library: %s (for "
 			"architecture %s) (bad string table index for symbol "
-			"%lu)", old_dylib, arch_name, i);
+			"%u)", old_dylib, arch_name, i);
 		else
 		    fatal("malformed dynamic shared library: %s (bad string "
-			"table index for symbol %lu)", old_dylib, i);
+			"table index for symbol %u)", old_dylib, i);
 	    }
 	}
 	for(i = 0; i < old_dyst->ntoc; i++){
@@ -419,11 +423,11 @@ enum bool new_api_allowed)
 		if(arch_name != NULL)
 		    fatal("malformed dynamic shared library: %s (for "
 			"architecture %s) (symbol_index field of table of "
-			"contents entry %lu past the end of the symbol table)",
+			"contents entry %u past the end of the symbol table)",
 			old_dylib, arch_name, i);
 		else
 		    fatal("malformed dynamic shared library: %s (symbol_index "
-			"field of table of contents entry %lu past the end of "
+			"field of table of contents entry %u past the end of "
 			"the symbol table)", old_dylib, i);
 	    }
 	}
@@ -486,10 +490,10 @@ enum bool new_api_allowed)
 		if(arch_name != NULL)
 		    fatal("malformed dynamic shared library: %s (for "
 			"architecture %s) (bad string table index for symbol "
-			"%lu)", new_dylib, arch_name, i);
+			"%u)", new_dylib, arch_name, i);
 		else
 		    fatal("malformed dynamic shared library: %s (bad string "
-			"table index for symbol %lu)", new_dylib, i);
+			"table index for symbol %u)", new_dylib, i);
 	    }
 	}
 	for(i = 0; i < new_dyst->ntoc; i++){
@@ -497,11 +501,11 @@ enum bool new_api_allowed)
 		if(arch_name != NULL)
 		    fatal("malformed dynamic shared library: %s (for "
 			"architecture %s) (symbol_index field of table of "
-			"contents entry %lu past the end of the symbol table)",
+			"contents entry %u past the end of the symbol table)",
 			new_dylib, arch_name, i);
 		else
 		    fatal("malformed dynamic shared library: %s (symbol_index "
-			"field of table of contents entry %lu past the end of "
+			"field of table of contents entry %u past the end of "
 			"the symbol table)", new_dylib, i);
 	    }
 	}

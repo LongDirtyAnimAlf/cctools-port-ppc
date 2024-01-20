@@ -61,6 +61,8 @@
  *	@(#)archive.h	8.3 (Berkeley) 4/2/94
  */
 
+#include <sys/types.h>
+
 /* Ar(1) options. */
 #define	AR_A	0x0001
 #define	AR_B	0x0002
@@ -120,10 +122,6 @@ typedef struct {
 
 
 #include <sys/cdefs.h>
-
-#if defined(__CYGWIN__)
-#define DEFFILEMODE (S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)/* 0666*/
-#endif
 
 struct stat;
 

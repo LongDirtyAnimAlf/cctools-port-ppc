@@ -1,346 +1,369 @@
-AC_INIT([odcctools], [622.3od16], [odcctools@opendarwin.org])
-AC_PREREQ([2.57])
-AC_REVISION([$Revision: 1.45 $])
-
-AC_CONFIG_SRCDIR([APPLE_LICENSE])
-AC_CONFIG_HEADERS([include/config.h])
+AC_INIT([cctools], [895], [longdirtyanimalf@gmail.com])
 
 AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
 AC_CANONICAL_TARGET
 
-AC_PROG_LEX
-AC_PROG_YACC
-
 AC_ARG_PROGRAM
 
-case $target_os in
-darwin*)
-	:
-	;;
-*)
-	AC_MSG_ERROR([$PACKAGE_NAME only supports targeting Darwin])
-	;;
+AM_CONDITIONAL([ISDARWIN], [false])
+
+isdarwin=no
+iscygwin=no
+
+if test "x$CFLAGS" = "x"; then
+  CFLAGS="-O3"
+fi
+
+if test "x$CXXFLAGS" = "x"; then
+  CXXFLAGS="-O3"
+fi
+
+if test "x$OBJCFLAGS" = "x"; then
+  OBJCFLAGS="-O3"
+fi
+
+# CXXFLAGS="$CXXFLAGS -std=c++0x"
+
+if test "x$build" = "x$host"; then
+  CFLAGS="$CFLAGS -isystem /usr/local/include -isystem /usr/pkg/include"
+  CXXFLAGS="$CXXFLAGS -isystem /usr/local/include -isystem /usr/pkg/include"
+  LDFLAGS="$LDFLAGS -L/usr/local/lib -L/usr/pkg/lib"
+fi
+
+CWARNINGS=""
+OBJCWARNINGS=""
+CXXWARNINGS=""
+EXTRAFLAGS=""
+EXTRACXXFLAGS=""
+WARNINGS=""
+
+case $host_os in
+  *cygwin* ) iscygwin=yes;;
+	 * ) iscygwin=no;;
 esac
 
-case $target_cpu in
-     arm)
-        AC_DEFINE(EMULATED_HOST_CPU_TYPE, 12, [Emulated CPU type])        
-        AC_DEFINE(EMULATED_HOST_CPU_SUBTYPE, 6, [Emulated CPU subtype])
-        AC_DEFINE(DEFAULT_MACH_ARCH, "arm", [Default Mach architecture name])
-	;;
-     powerpc)
-        AC_DEFINE(EMULATED_HOST_CPU_TYPE, 18, [Emulated CPU type])        
-        AC_DEFINE(EMULATED_HOST_CPU_SUBTYPE, 100, [Emulated CPU subtype]) 
-        AC_DEFINE(DEFAULT_MACH_ARCH, "ppc", [Default Mach architecture name])
-	;;
-     powerpc64)
-        AC_DEFINE(EMULATED_HOST_CPU_TYPE, 16777234, [Emulated CPU type])        
-        AC_DEFINE(EMULATED_HOST_CPU_SUBTYPE, 0, [Emulated CPU subtype])        
-        AC_DEFINE(DEFAULT_MACH_ARCH, "ppc64", [Default Mach architecture name])
-	;;
-     i?86)
-        AC_DEFINE(EMULATED_HOST_CPU_TYPE, 7, [Emulated CPU type])        
-        AC_DEFINE(EMULATED_HOST_CPU_SUBTYPE, 3, [Emulated CPU subtype])        
-        AC_DEFINE(DEFAULT_MACH_ARCH, "i386", [Default Mach architecture name])
-	;;
-     x86_64)
-        AC_DEFINE(EMULATED_HOST_CPU_TYPE, 16777223, [Emulated CPU type])        
-        AC_DEFINE(EMULATED_HOST_CPU_SUBTYPE, 3, [Emulated CPU subtype])        
-        AC_DEFINE(DEFAULT_MACH_ARCH, "x86_64", [Default Mach architecture name])
-	;;
-     *)
-	AC_MSG_ERROR([Unsupported target $target_cpu])
-	;;
+case $host_os in
+  darwin* )
+    isdarwin=yes
+    AM_CONDITIONAL([ISDARWIN], [true])
+  ;;
+  openbsd* )
+    XCC="egcc"
+    XCXX="eg++"
+  ;;
+  *mingw* | *cygwin* | *msys* )
+    EXTRAFLAGS="-D__LARGE64_FILES -D_GNU_SOURCE -fno-PIC"
+    # CXXFLAGS="$CXXFLAGS -D_GNU_SOURCE"
+    # CFLAGS="$CFLAGS -D_GNU_SOURCE -D_BSD_SOURCE -fcommon"    
+    WARNINGS="-Wno-attributes"
+    XCC="gcc"
+    XCXX="g++"
+  ;;
 esac
 
+if test "x$isdarwin" = "xno"; then
+  case $host_cpu in
+    arm* )
+      # clang miscompiles ld64 on arm
+      if test "x$isdarwin" = "xno"; then
+        XCC="gcc"
+        XCXX="g++"
+      fi
+    ;;
+  esac
+fi
+
+if test "x$XCC" = "x"; then
+  XCC="clang"
+fi
+
+if test "x$XCXX" = "x"; then
+  XCXX="clang++"
+fi
+
+if test "x$CC" = "x"; then
+  if test "x$build" != "x$host"; then
+    CC="${host_alias}-${XCC}"
+    which $CC 2>/dev/null 1>&2
+    if test $? -ne 0; then
+      CC="${host_alias}-gcc"
+    fi
+   else
+    CC=$XCC
+    which $CC 2>/dev/null 1>&2
+    if test $? -ne 0; then
+      CC="gcc"
+    fi
+  fi
+fi
+
+if test "x$CXX" = "x"; then
+  if test "x$build" != "x$host"; then
+    CXX="${host_alias}-${XCXX}"
+    which $CXX 2>/dev/null 1>&2
+    if test $? -ne 0; then
+      CXX="${host_alias}-g++"
+    fi
+  else
+    CXX=$XCXX
+    which $CXX 2>/dev/null 1>&2
+    if test $? -ne 0; then
+      CXX="g++"
+    fi
+  fi
+fi
+
+CCVERSION="`$CC --version`"
+CXXVERSION="`$CXX --version`"
+
+case "$CCVERSION" in
+  *clang* )
+    WARNINGS="$WARNINGS -Wall -Wno-long-long -Wno-import -Wno-format -Wno-deprecated -Wno-unused-variable"
+    WARNINGS="$WARNINGS -Wno-unused-private-field -Wno-unused-function -Wno-invalid-offsetof"
+    WARNINGS="$WARNINGS -Wno-int-conversion -Wno-char-subscripts"
+    OBJCWARNINGS="-Wall -Wno-objc-root-class -Wno-deprecated-objc-isa-usage"
+  ;;
+  * )
+    WARNINGS="$WARNINGS -Wall -Wno-format -Wno-enum-compare -Wno-unused-result -Wno-unused-variable"
+    WARNINGS="$WARNINGS -Wno-unused-but-set-variable -Wno-deprecated -Wno-deprecated-declarations"
+    WARNINGS="$WARNINGS -Wno-char-subscripts -Wno-strict-aliasing"
+    OBJCWARNINGS="-Wall"
+    CFLAGS="$CFLAGS -std=gnu11 -D__private_extern__="
+    CXXFLAGS="$CXXFLAGS -D__private_extern__="
+  ;;
+esac
+
+case "$CXXVERSION" in
+  *clang* )
+    if test "x$isdarwin" = "xyes"; then
+      CXXFLAGS="$CXXFLAGS -stdlib=libc++"
+    fi
+    # can't use -fblocks on cyggwin due to a clang driver bug
+    if test "x$iscygwin" = "xno"; then
+      EXTRACXXFLAGS="$EXTRACXXFLAGS -fblocks"
+    else
+      EXTRAFLAGS="$EXTRAFLAGS -integrated-as"
+    fi
+  ;;
+esac
+
+case $host_cpu in
+  powerpc)
+    EXTRAFLAGS="$EXTRAFLAGS -D__ppc__"
+  ;;
+  powerpc64*)
+    EXTRAFLAGS="$EXTRAFLAGS -D__ppc__ -D__ppc64__"
+  ;;
+  arm64*|aarch64)
+    EXTRAFLAGS="$EXTRAFLAGS -D__arm64__"
+  ;;
+  arm*)
+    case "$CXXVERSION" in
+      *clang* )
+        echo "" >&2
+        echo "clang is known to miscompile ld64 on arm platforms:" >&2
+        echo "https://github.com/tpoechtrager/cctools-port/issues/1#issuecomment-59118615" >&2
+        if test "x$isdarwin" = "xno"; then
+          echo "" >&2
+          echo "please use gcc instead;  CC=gcc CXX=g++ ./configure" >&2
+          echo "" >&2
+          exit 1
+        fi
+        echo "" >&2
+        sleep 2
+      ;;
+    esac
+    EXTRAFLAGS="$EXTRAFLAGS -D__arm__"
+  ;;
+esac
+
+if test "x$EXTRAFLAGS" != "x"; then
+  CFLAGS="$CFLAGS $EXTRAFLAGS"
+  OBJCFLAGS="$OBJCFLAGS $EXTRAFLAGS"
+  CXXFLAGS="$CXXFLAGS $EXTRAFLAGS"
+fi
+
+if test "xEXTRACXXFLAGS" != "x"; then
+  CXXFLAGS="$CXXFLAGS $EXTRACXXFLAGS"
+fi
+
+CPP="$CC -E"
+OBJC="$CC"
+
+# FIXME 'subdir-objects' breaks dependency tracking
+AM_INIT_AUTOMAKE([1.10 no-define no-dist-gzip dist-bzip2 tar-ustar subdir-objects no-dependencies])
+
+AC_CONFIG_MACRO_DIR([m4])
+AM_MAINTAINER_MODE
+
+AC_PREREQ([2.57])
+AC_REVISION([$Revision: 1.37 $])
+
+AC_CONFIG_SRCDIR([APPLE_LICENSE])
+LT_PREREQ([2.2.6])
+LT_INIT(disable-static)
 
 AC_PROG_INSTALL
-AC_PROG_LN_S
-AC_PROG_CC
-AC_PROG_CXX
+
+AC_PROG_CC([clang])
+AC_PROG_CXX([clang++])
+AM_PROG_CC_C_O
+AC_PROG_OBJC([clang])
+AM_PROG_AS([clang])
 
 AC_CHECK_TOOL([HOST_RANLIB], [ranlib], :)
 AC_CHECK_TOOL([HOST_AR], [ar], :)
 
-ASTARGETS=""
-conftargets=""
-AC_MSG_CHECKING([for configured assembler targets])
-AC_ARG_ENABLE([as-targets],
-		AC_HELP_STRING([--enable-as-targets],
-				[space-separated list ("arm", "ppc", "ppc64", "i386", "x86_64", "all")]),
-		[conftargets="$enableval"],
-		[conftargets="default"])
-
-case "$conftargets" in
-     all)
-        ASTARGETS="ppc ppc64 i386 x86_64 arm"
-	;;
-     default)
-	ASTARGETS="ppc ppc64 i386 x86_64 arm"
-	;;
-     yes)
-	AC_MSG_ERROR([no assembler targets configured])
-	;;
-     no)
-	AC_MSG_ERROR([no assembler targets configured])
-	;;
+#for libstuff emulated.c
+case $target_cpu in
+     powerpc)
+        AC_DEFINE(EMULATED_HOST_CPU_TYPE, 18, [Emulated CPU type])
+        AC_DEFINE(EMULATED_HOST_CPU_SUBTYPE, 100, [Emulated CPU subtype])
+    ;;
+     powerpc64*)
+        AC_DEFINE(EMULATED_HOST_CPU_TYPE, 16777234, [Emulated CPU type])
+        AC_DEFINE(EMULATED_HOST_CPU_SUBTYPE, 0, [Emulated CPU subtype])
+       ;;
+     i?86)
+        AC_DEFINE(EMULATED_HOST_CPU_TYPE, 7, [Emulated CPU type])
+        AC_DEFINE(EMULATED_HOST_CPU_SUBTYPE, 10, [Emulated CPU subtype])
+    ;;
+     x86_64|amd64)
+        AC_DEFINE(EMULATED_HOST_CPU_TYPE, 16777223, [Emulated CPU type])
+        AC_DEFINE(EMULATED_HOST_CPU_SUBTYPE, 3, [Emulated CPU subtype])
+    ;;
+     arm64*|aarch64)
+        AC_DEFINE(EMULATED_HOST_CPU_TYPE, 16777228, [Emulated CPU type])
+        AC_DEFINE(EMULATED_HOST_CPU_SUBTYPE, 0, [Emulated CPU subtype])
+    ;;
+     arm*)
+        AC_DEFINE(EMULATED_HOST_CPU_TYPE, 12, [Emulated CPU type])
+        AC_DEFINE(EMULATED_HOST_CPU_SUBTYPE, 0, [Emulated CPU subtype])
+    ;;
      *)
-	if [[ -z "$conftargets" ]]; then
-	   AC_MSG_ERROR([no assembler targets configured])
-	fi
-	ASTARGETS="$conftargets"
-	;;
+    AC_MSG_ERROR([Unsupported target $target_cpu])
+    ;;
 esac
 
-AC_MSG_RESULT([$ASTARGETS])
-AC_SUBST([ASTARGETS], [$ASTARGETS]) 
+# as reported, some users may use llvm-c/Disassembler.h instead of a local copy in include dir.
+# add these macros to avoid compilation failures.
 
-AC_ARG_WITH([sysroot],
-		AC_HELP_STRING([--with-sysroot],
-				[filesystem root of cross build environment]),
-		[AC_DEFINE_UNQUOTED([CROSS_SYSROOT],["$withval"],[filesystem root of cross build environment])])
+AC_DEFINE(__STDC_LIMIT_MACROS)
+AC_DEFINE(__STDC_CONSTANT_MACROS)
 
-AC_ARG_ENABLE([ld64],
-    AC_HELP_STRING([--enable-ld64], [build ld64 as well]))
+AC_SUBST([ASLIBEXECDIR], ['${libexecdir}/as'])
 
-LD64=""
-if test "$enable_ld64" = yes; then
-    LD64="ld64"
-    AC_CHECK_HEADER(uuid/uuid.h,have_uuid_h=yes,have_uuid_h=no)
-    if test $have_uuid_h = no; then
-	    AC_CHECK_HEADER(ossp/uuid.h,have_uuid_h=yes,have_uuid_h=no)
-	    if test $have_uuid_h = no; then
-		    AC_CHECK_HEADER(uuid.h,,AC_ERROR([Could not find uuid.h]))
-	    else
-		    AC_DEFINE([HAVE_OSSP_UUID_H],[],[Defined if uuid.h is in the ossp/ subdir])
-	    fi
-    else
-	    AC_DEFINE([HAVE_UUID_UUID_H],[],[Defined if uuid.h is in the uuid/ subdir])
-    fi
-
-    AC_SEARCH_LIBS([uuid_generate], [uuid], have_linux_uuid=yes, have_linux_uuid=no)    
+# set PROGRAM PREFIX
+if test "$target_alias"; then
+  AC_SUBST([PROGRAM_PREFIX], ['${target_alias}-'])
 fi
 
+AC_CHECK_LIB([dl],[dlopen],[DL_LIB=-ldl])
+AC_SUBST(DL_LIB)
+
+AC_CHECK_LIB([pthread],[pthread_create],[PTHREAD_FLAGS=-pthread])
+AC_SUBST(PTHREAD_FLAGS)
+
+AC_CHECK_HEADERS([execinfo.h], [
+  AC_CHECK_LIB([execinfo],[backtrace],[EXECINFO_LIB=-lexecinfo])], [])
+AC_SUBST(EXECINFO_LIB)
+
+AC_CHECK_LIB([uuid],[uuid_generate_random],[
+  AC_CHECK_HEADERS([uuid/uuid.h], [UUID_LIB=-luuid])], [])
+AC_SUBST(UUID_LIB)
+
+AC_CHECK_FUNCS([strmode])
+
+### Check for __cxa_demangle in various C++ ABI libs ###
+
+AC_CHECK_LIB([c++abi],[__cxa_demangle],[CXXABI_LIB=-lc++abi],[
+  AC_CHECK_LIB([c++],[__cxa_demangle],[CXXABI_LIB=-lc++],[
+    AC_CHECK_LIB([supc++],[__cxa_demangle],[CXXABI_LIB=-lsupc++],[
+      AC_CHECK_LIB([stdc++],[__cxa_demangle],[CXXABI_LIB=-lstdc++],[exit 1])
+    ])
+  ])
+])
+
+AC_SUBST(CXXABI_LIB)
+
+### Check for supported warning options ###
+
 ORIGCFLAGS=$CFLAGS
-CFLAGS="$CFLAGS -mdynamic-no-pic"
-AC_MSG_CHECKING([if -mdynamic-no-pic is supported])
+CFLAGS="$CFLAGS -Werror -Wno-shift-negative-value"
+AC_MSG_CHECKING([whether $CC supports -Wno-shift-negative-value])
 AC_COMPILE_IFELSE(
-   [AC_LANG_SOURCE([[const char hw[] = "Hello, World\n";]])],
-   [AC_SUBST([MDYNAMICNOPIC],[-mdynamic-no-pic])
-    AC_MSG_RESULT([yes])],
-   [AC_SUBST([MDYNAMICNOPIC],[])
-    AC_MSG_RESULT([no])]
-)
-CFLAGS=$ORIGCFLAGS
-
-ORIGCFLAGS=$CFLAGS
-CFLAGS="$CFLAGS -fno-builtin-round"
-AC_MSG_CHECKING([if -fno-builtin-round is supported])
-AC_COMPILE_IFELSE(
-   [AC_LANG_SOURCE([[const char hw[] = "Hello, World\n";]])],
-   [AC_MSG_RESULT([yes])],
-   [CFLAGS=$ORIGCFLAGS
-    AC_MSG_RESULT([no])]
-)
-
-ORIGCFLAGS=$CFLAGS
-CFLAGS="$CFLAGS -fno-builtin-trunc"
-AC_MSG_CHECKING([if -fno-builtin-trunc is supported])
-AC_COMPILE_IFELSE(
-   [AC_LANG_SOURCE([[const char hw[] = "Hello, World\n";]])],
-   [AC_MSG_RESULT([yes])],
-   [CFLAGS=$ORIGCFLAGS
-    AC_MSG_RESULT([no])]
-)
-
-ORIGCFLAGS=$CFLAGS
-CFLAGS="$CFLAGS -no-cpp-precomp"
-supported=0
-AC_MSG_CHECKING([if -no-cpp-precomp is supported])
-AC_LANG_CONFTEST([[const char hw[] = "Hello, World\n";]])
-rm -f conftest.$ac_objext conftest$ac_exeext
-out=`$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext 2>&1`
-if [[ $? -ne 0 ]]; then
-   supported=0;
-else
-   unrecog=`echo $out | grep unrecog | wc -l`
-   if [[ $unrecog -gt 0 ]]; then
-      supported=0;
-   else
-      supported=1;
-   fi
-fi
-
-if [[ $supported -eq 1 ]]; then
-   AC_MSG_RESULT([yes])
-else
-   CFLAGS="$ORIGCFLAGS"
-   AC_MSG_RESULT([no])
-fi
-rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
-
-WARNINGS=""
-
-ORIGCFLAGS=$CFLAGS
-CFLAGS="$CFLAGS -Wall"
-AC_MSG_CHECKING([if -Wall is supported])
-AC_COMPILE_IFELSE(
-   [AC_LANG_SOURCE([[const char hw[] = "Hello, World\n";]])],
-   [WARNINGS="$WARNINGS -Wall"
-    AC_MSG_RESULT([yes])],
-   [AC_MSG_RESULT([no])]
-)
-CFLAGS=$ORIGCFLAGS
-
-ORIGCFLAGS=$CFLAGS
-CFLAGS="$CFLAGS -Wno-long-double"
-AC_MSG_CHECKING([if -Wno-long-double is supported])
-AC_COMPILE_IFELSE(
-   [AC_LANG_SOURCE([[const char hw[] = "Hello, World\n";
-		   void* should_warn = 5;
-		   ]])],
-   [WARNINGS="$WARNINGS -Wno-long-double"
-    AC_MSG_RESULT([yes])],
-   [AC_MSG_RESULT([no])]
-)
-CFLAGS=$ORIGCFLAGS
-
-ORIGCFLAGS=$CFLAGS
-CFLAGS="$CFLAGS -Wno-import"
-AC_MSG_CHECKING([if -Wno-import is supported])
-AC_COMPILE_IFELSE(
-   [AC_LANG_SOURCE([[const char hw[] = "Hello, World\n";
-		   void* should_warn = 5;
-		   ]])],
-   [WARNINGS="$WARNINGS -Wno-import"
-    AC_MSG_RESULT([yes])],
-   [AC_MSG_RESULT([no])]
+  [AC_LANG_SOURCE([[int dummy;]])],
+  [WARNINGS="$WARNINGS -Wno-shift-negative-value"
+   AC_MSG_RESULT([yes])],
+  [AC_MSG_RESULT([no])]
 )
 CFLAGS=$ORIGCFLAGS
 
 AC_SUBST([WARNINGS], [$WARNINGS])
+AC_SUBST([OBJCWARNINGS], [$OBJCWARNINGS])
 
-ORIGCFLAGS=$CFLAGS
-CFLAGS="$CFLAGS -x objective-c"
-OBJC="-x objective-c"
-AC_MSG_CHECKING([if -x objective-c is supported])
-AC_COMPILE_IFELSE(
-   [AC_LANG_SOURCE([[@class foo;
-void bar(void) {
-     [foo alloc];
-}
-]])],
-   [AC_DEFINE(HAVE_OBJC, 1, [Have Objective-C support])
-    AC_MSG_RESULT([yes])],
-   [OBJC=""
-    AC_MSG_RESULT([no])]
-)
-AC_SUBST([OBJC], [$OBJC])
-CFLAGS=$ORIGCFLAGS
-
-
-AC_MSG_CHECKING([if __private_extern__ is supported])
-AC_COMPILE_IFELSE(
-   [AC_LANG_SOURCE([[__private_extern__ int foo;]])],
-   [AC_SUBST([HAVE_PRIVEXT], [YES])
-    AC_MSG_RESULT([yes])],
-   [AC_SUBST([HAVE_PRIVEXT], [NO])
-    AC_MSG_RESULT([no])]
-)
+### Check for libLTO ###
 
 ORIGLDFLAGS=$LDFLAGS
-LDFLAGS="-multiply_defined suppress"
-AC_MSG_CHECKING([if -multiply_defined suppress is supported])
-AC_LINK_IFELSE([AC_LANG_PROGRAM()],
-	[AC_MSG_RESULT([yes])],
-	[LDFLAGS="$ORIGLDFLAGS"
-	 AC_MSG_RESULT([no])]
+LDFLAGS="$LDFLAGS -Wl,-rpath,/usr/local/lib,--enable-new-dtags"
+AC_MSG_CHECKING([whether ld supports -rpath,<path>,--enable-new-dtags])
+AC_LINK_IFELSE(
+  [AC_LANG_SOURCE([[int main(){}]])],
+  [rpathlink=yes
+  AC_MSG_RESULT([yes])],
+  [AC_MSG_RESULT([no])]
 )
+LDFLAGS=$ORIGLDFLAGS
 
-AC_HEADER_STDC
-AC_CHECK_HEADERS([stdio.h errno.h limits.h])
-if [[ "x$OBJC" != "x" ]]; then
-   ORIGCFLAGS=$CFLAGS
-   CFLAGS="$CFLAGS $OBJC"
-   AC_CHECK_HEADERS([objc/objc-runtime.h])
-   CFLAGS="$ORIGCFLAGS"
+CHECK_LLVM
+
+LDFLAGS="$LDFLAGS $LTO_RPATH"
+
+### Check for libxar ###
+
+if test "x$LLVM_CONFIG" != "xno"; then
+
+AC_CHECK_LIB([xar],[xar_prop_create],[
+  AC_CHECK_HEADERS([xar/xar.h], [XAR_LIB=-lxar])], [])
+AC_SUBST(XAR_LIB)
+
 fi
 
-AC_MSG_CHECKING([for max unsigned long long])
-AC_COMPILE_IFELSE(
-   [AC_LANG_SOURCE([[#if HAVE_LIMITS_H
-			 #include <limits.h>
-		     #endif
-		     unsigned long long a = ULLONG_MAX;]])],
-   [AC_MSG_RESULT([ULLONG_MAX])],
-   [AC_COMPILE_IFELSE(
-	[AC_LANG_SOURCE([[#if HAVE_LIMITS_H
-			      #include <limits.h>
-			 #endif
-			 unsigned long long a = 18446744073709551615ULL;]])],
-	[AC_DEFINE(ULLONG_MAX, [18446744073709551615ULL], [max unsigned long long])
-	 AC_MSG_RESULT([18446744073709551615ULL])],
-	[AC_MSG_RESULT([none]) ]
-	)
-    ]
-)
+### Check whether we want to use clang as assembler ###
 
-AC_CHECK_FUNCS(
-    [strmode qsort_r qsort getattrlist NSIsSymbolNameDefined strlcpy])
+AC_ARG_ENABLE([clang-as],
+AS_HELP_STRING([--disable-clang-as],
+               [do not use clang for assembling]),
+[], [enable_clang_as=yes])
 
-AC_CHECK_DECLS([getc_unlocked])
-AH_VERBATIM([HAVE_DECL_GETC_UNLOCKED_REPLACEMENT],
-[/* For systems that don't have getc_unlocked, use getc  */
-#if !HAVE_DECL_GETC_UNLOCKED
-# define getc_unlocked(a) getc(a)
-#endif])
+if test "x$enable_clang_as" != "xyes"; then
+  CFLAGS="$CFLAGS -DDISABLE_CLANG_AS"
+fi
 
+### Check endianness ###
 
+AC_C_BIGENDIAN([AC_SUBST([ENDIAN_FLAG],[-D__BIG_ENDIAN__=1])],
+      [AC_SUBST([ENDIAN_FLAG],[-D__LITTLE_ENDIAN__=1])])
 
-case $host_os in
-     darwin*)
-	AC_SUBST([HAVE_FOREIGN_HEADERS],[NO])
-	;;
-     *)
-	AC_SUBST([HAVE_FOREIGN_HEADERS],[YES])
-	AC_SUBST([EMULATED_OBJ], [emulated.c])
-	AC_C_BIGENDIAN([AC_SUBST([ENDIAN_FLAG],[-D__BIG_ENDIAN__=1])],
-			[AC_SUBST([ENDIAN_FLAG],[-D__LITTLE_ENDIAN__=1])])
-	;;
-esac
-
-COMPONENTS="ar as include libstuff libmacho ld $LD64 man misc otool"
-AC_SUBST([COMPONENTS], [$COMPONENTS])
-
-AC_CONFIG_FILES([Makefile include/Makefile libstuff/Makefile libmacho/Makefile])
+AC_CONFIG_FILES([Makefile libstuff/Makefile])
 AC_CONFIG_FILES([ar/Makefile])
 AC_CONFIG_FILES([as/Makefile])
-for ast in $ASTARGETS; do
-    case $ast in
-    ppc)
-	AC_CONFIG_FILES([as/ppc/Makefile:as/ppc/Makefile.in:as/Makefile.arch.in])
-	;;
-    ppc64)
-	AC_CONFIG_FILES([as/ppc64/Makefile:as/ppc64/Makefile.in:as/Makefile.arch.in])
-	;;
-    i386)
-	AC_CONFIG_FILES([as/i386/Makefile:as/i386/Makefile.in:as/Makefile.arch.in])
-	;;
-    x86_64)
-	AC_CONFIG_FILES([as/x86_64/Makefile:as/x86_64/Makefile.in:as/Makefile.arch.in])
-    ;;
-    arm)
-	AC_CONFIG_FILES([as/arm/Makefile:as/arm/Makefile.in:as/Makefile.arch.in])
-	;;
-    *)
-	AC_MSG_ERROR([Unrecognized assembler target $ast])
-	;;
-    esac
-done
-AC_CONFIG_FILES([ld/Makefile])
-AC_CONFIG_FILES([ld64/Makefile])
-AC_CONFIG_FILES([man/Makefile])
+AC_CONFIG_FILES([as/arm/Makefile])
+AC_CONFIG_FILES([as/i386/Makefile])
+AC_CONFIG_FILES([as/x86_64/Makefile])
+AC_CONFIG_FILES([as/ppc/Makefile])
+AC_CONFIG_FILES([as/ppc64/Makefile])
+##AC_CONFIG_FILES([man/Makefile])
 AC_CONFIG_FILES([misc/Makefile])
-AC_CONFIG_FILES([otool/Makefile])
+##AC_CONFIG_FILES([ld/Makefile])
+AC_CONFIG_FILES([ld64/Makefile])
+AC_CONFIG_FILES([ld64/src/Makefile])
+AC_CONFIG_FILES([ld64/src/3rd/Makefile])
+AC_CONFIG_FILES([ld64/src/3rd/BlocksRuntime/Makefile])
+AC_CONFIG_FILES([ld64/src/ld/Makefile])
+AC_CONFIG_FILES([ld64/src/ld/parsers/Makefile])
+AC_CONFIG_FILES([ld64/src/ld/passes/Makefile])
+AC_CONFIG_FILES([ld64/src/other/Makefile])
+
 AC_OUTPUT

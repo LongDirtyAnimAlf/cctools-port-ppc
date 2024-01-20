@@ -31,12 +31,21 @@
 #include <mach-o/reloc.h>
 #include <mach-o/ranlib.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 extern void swap_fat_header(
     struct fat_header *fat_header,
     enum NXByteOrder target_byte_order);
 
 extern void swap_fat_arch(
     struct fat_arch *fat_archs,
+    uint32_t nfat_arch,
+    enum NXByteOrder target_byte_order);
+
+extern void swap_fat_arch_64(
+    struct fat_arch_64 *fat_archs64,
     uint32_t nfat_arch,
     enum NXByteOrder target_byte_order);
 
@@ -146,6 +155,50 @@ extern void swap_uuid_command(
     struct uuid_command *uuid_cmd,
     enum NXByteOrder target_byte_sex);
 
+extern void swap_linkedit_data_command(
+    struct linkedit_data_command *ld,
+    enum NXByteOrder target_byte_sex);
+
+extern void swap_version_min_command(
+    struct version_min_command *ver_cmd,
+    enum NXByteOrder target_byte_sex);
+
+extern void swap_rpath_command(
+    struct rpath_command *rpath_cmd,
+    enum NXByteOrder target_byte_sex);
+
+extern void swap_encryption_command(
+    struct encryption_info_command *ec,
+    enum NXByteOrder target_byte_sex);
+
+extern void swap_encryption_command_64(
+    struct encryption_info_command_64 *ec,
+    enum NXByteOrder target_byte_sex);
+
+extern void swap_linker_option_command(
+    struct linker_option_command *lo,
+    enum NXByteOrder target_byte_sex);
+
+extern void swap_dyld_info_command(
+    struct dyld_info_command *ed,
+    enum NXByteOrder target_byte_sex);
+
+extern void swap_entry_point_command(
+    struct entry_point_command *ep,
+    enum NXByteOrder target_byte_sex);
+
+extern void swap_source_version_command(
+    struct source_version_command *sv,
+    enum NXByteOrder target_byte_sex);
+
+extern void swap_prebind_cksum_command(
+    struct prebind_cksum_command *cksum_cmd,
+    enum NXByteOrder target_byte_sex);
+
+extern void swap_uuid_command(
+    struct uuid_command *uuid_cmd,
+    enum NXByteOrder target_byte_sex);
+
 extern void swap_twolevel_hint(
     struct twolevel_hint *hints,
     uint32_t nhints,
@@ -164,6 +217,11 @@ extern void swap_nlist_64(
 extern void swap_ranlib(
     struct ranlib *ranlibs,
     uint32_t nranlibs,
+    enum NXByteOrder target_byte_order);
+
+extern void swap_ranlib_64(
+    struct ranlib_64 *ranlibs,
+    uint64_t nranlibs,
     enum NXByteOrder target_byte_order);
 
 extern void swap_relocation_info(
@@ -195,5 +253,9 @@ extern void swap_dylib_table_of_contents(
     struct dylib_table_of_contents *tocs,
     uint32_t ntocs,
     enum NXByteOrder target_byte_sex);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _MACH_O_SWAP_H_ */

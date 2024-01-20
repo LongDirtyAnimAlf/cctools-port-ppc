@@ -77,7 +77,7 @@
 #define __xer xer
 
 #define __darwin_i386_exception_state i386_exception_state
-//#define __darwin_i386_float_state i386_float_state
+#define __darwin_i386_float_state i386_float_state
 #define __darwin_i386_thread_state i386_thread_state
 #define __busy busy
 #define __c0 c0
@@ -200,10 +200,17 @@
 #include <mach/i386/thread_status.h>
 #include <mach/hppa/thread_status.h>
 #include <mach/sparc/thread_status.h>
+/* cctools-port: need to undef these to avoid warnings */
+#undef MACHINE_THREAD_STATE
+#undef MACHINE_THREAD_STATE_COUNT
+#undef THREAD_STATE_NONE
+#undef VALID_THREAD_STATE_FLAVOR
 #include <mach/arm/thread_status.h>
 #include <mach-o/nlist.h>
 #include <mach-o/reloc.h>
 #include <mach-o/ranlib.h>
+#include "../include/xar/xar.h" /* cctools-port: 
+				   force the use of the bundled xar header */
 #include "stuff/bool.h"
 #include "stuff/bytesex.h"
 
@@ -300,10 +307,10 @@ __private_extern__
 void
 swap_fat_arch(
 struct fat_arch *fat_archs,
-unsigned long nfat_arch,
+uint32_t nfat_arch,
 enum byte_sex target_byte_sex)
 {
-    unsigned long i;
+    uint32_t i;
 #ifdef __MWERKS__
     enum byte_sex dummy;
         dummy = target_byte_sex;
@@ -315,6 +322,29 @@ enum byte_sex target_byte_sex)
 	    fat_archs[i].offset     = SWAP_INT(fat_archs[i].offset);
 	    fat_archs[i].size       = SWAP_INT(fat_archs[i].size);
 	    fat_archs[i].align      = SWAP_INT(fat_archs[i].align);
+	}
+}
+
+__private_extern__
+void
+swap_fat_arch_64(
+struct fat_arch_64 *fat_archs64,
+uint32_t nfat_arch,
+enum byte_sex target_byte_sex)
+{
+    uint32_t i;
+#ifdef __MWERKS__
+    enum byte_sex dummy;
+        dummy = target_byte_sex;
+#endif
+
+	for(i = 0; i < nfat_arch; i++){
+	    fat_archs64[i].cputype    = SWAP_INT(fat_archs64[i].cputype);
+	    fat_archs64[i].cpusubtype = SWAP_INT(fat_archs64[i].cpusubtype);
+	    fat_archs64[i].offset     = SWAP_LONG_LONG(fat_archs64[i].offset);
+	    fat_archs64[i].size       = SWAP_LONG_LONG(fat_archs64[i].size);
+	    fat_archs64[i].align      = SWAP_INT(fat_archs64[i].align);
+	    fat_archs64[i].reserved   = SWAP_INT(fat_archs64[i].reserved);
 	}
 }
 
@@ -421,10 +451,10 @@ __private_extern__
 void
 swap_section(
 struct section *s,
-unsigned long nsects,
+uint32_t nsects,
 enum byte_sex target_byte_sex)
 {
-    unsigned long i;
+    uint32_t i;
 #ifdef __MWERKS__
     enum byte_sex dummy;
         dummy = target_byte_sex;
@@ -449,10 +479,10 @@ __private_extern__
 void
 swap_section_64(
 struct section_64 *s,
-unsigned long nsects,
+uint32_t nsects,
 enum byte_sex target_byte_sex)
 {
-    unsigned long i;
+    uint32_t i;
 #ifdef __MWERKS__
     enum byte_sex dummy;
         dummy = target_byte_sex;
@@ -705,7 +735,7 @@ swap_m68k_thread_state_regs(
 struct m68k_thread_state_regs *cpu,
 enum byte_sex target_byte_sex)
 {
-    unsigned long i;
+    uint32_t i;
 #ifdef __MWERKS__
     enum byte_sex dummy;
         dummy = target_byte_sex;
@@ -726,7 +756,7 @@ swap_m68k_thread_state_68882(
 struct m68k_thread_state_68882 *fpu,
 enum byte_sex target_byte_sex)
 {
-    unsigned long i, tmp;
+    uint32_t i, tmp;
 #ifdef __MWERKS__
     enum byte_sex dummy;
         dummy = target_byte_sex;
@@ -858,7 +888,7 @@ swap_ppc_float_state_t(
 ppc_float_state_t *fpu,
 enum byte_sex target_byte_sex)
 {
-    unsigned long i;
+    uint32_t i;
 #ifdef __MWERKS__
     enum byte_sex dummy;
         dummy = target_byte_sex;
@@ -877,7 +907,7 @@ swap_ppc_exception_state_t(
 ppc_exception_state_t *state,
 enum byte_sex target_byte_sex)
 {
-    unsigned long i;
+    uint32_t i;
 #ifdef __MWERKS__
     enum byte_sex dummy;
         dummy = target_byte_sex;
@@ -1163,7 +1193,7 @@ swap_m88110_thread_state_impl_t(
 m88110_thread_state_impl_t *spu,
 enum byte_sex target_byte_sex)
 {
-    unsigned long i;
+    uint32_t i;
     enum byte_sex host_byte_sex;
 
     struct swapped_m88110_bp_ctrl {
@@ -1313,7 +1343,7 @@ swap_i860_thread_state_regs(
 struct i860_thread_state_regs *cpu,
 enum byte_sex target_byte_sex)
 {
-    unsigned long i;
+    uint32_t i;
 #ifdef __MWERKS__
     enum byte_sex dummy;
         dummy = target_byte_sex;
@@ -1838,7 +1868,7 @@ enum byte_sex target_byte_sex)
     } ss;
 
     enum byte_sex host_byte_sex;
-    unsigned long i;
+    uint32_t i;
 
 	host_byte_sex = get_host_byte_sex();
 
@@ -2280,7 +2310,7 @@ enum byte_sex target_byte_sex)
 	    unsigned int word;
 	} u;
     } sfsr;
-    unsigned long i;
+    uint32_t i;
     struct f_status *fpu_status;
     enum byte_sex host_byte_sex;
 
@@ -2332,25 +2362,33 @@ enum byte_sex target_byte_sex)
 __private_extern__
 void
 swap_arm_thread_state_t(
-struct arm_thread_state *cpu,
+arm_thread_state_t *cpu,
 enum byte_sex target_byte_sex)
 {
-	cpu->r0 = SWAP_LONG(cpu->r0);
-	cpu->r1 = SWAP_LONG(cpu->r1);
-	cpu->r2 = SWAP_LONG(cpu->r2);
-	cpu->r3 = SWAP_LONG(cpu->r3);
-	cpu->r4 = SWAP_LONG(cpu->r4);
-	cpu->r5 = SWAP_LONG(cpu->r5);
-	cpu->r6 = SWAP_LONG(cpu->r6);
-	cpu->r7 = SWAP_LONG(cpu->r7);
-	cpu->r8 = SWAP_LONG(cpu->r8);
-	cpu->r9 = SWAP_LONG(cpu->r9);
-	cpu->r10 = SWAP_LONG(cpu->r10);
-	cpu->r11 = SWAP_LONG(cpu->r11);
-	cpu->r12 = SWAP_LONG(cpu->r12);
-	cpu->r13 = SWAP_LONG(cpu->r13);
-	cpu->r14 = SWAP_LONG(cpu->r14);
-	cpu->r15 = SWAP_LONG(cpu->r15);
+    int i;
+
+	for(i = 0; i < 13; i++)
+	    cpu->__r[i] = SWAP_INT(cpu->__r[i]);
+	cpu->__sp = SWAP_INT(cpu->__sp);
+	cpu->__lr = SWAP_INT(cpu->__lr);
+	cpu->__pc = SWAP_INT(cpu->__pc);
+	cpu->__cpsr = SWAP_INT(cpu->__cpsr);
+}
+
+void
+swap_arm_thread_state64_t(
+arm_thread_state64_t *cpu,
+enum byte_sex target_byte_sex)
+{
+    int i;
+
+	for(i = 0; i < 29; i++)
+	    cpu->__x[i] = SWAP_LONG_LONG(cpu->__x[i]);
+	cpu->__fp = SWAP_LONG_LONG(cpu->__fp);
+	cpu->__lr = SWAP_LONG_LONG(cpu->__lr);
+	cpu->__sp = SWAP_LONG_LONG(cpu->__sp);
+	cpu->__pc = SWAP_LONG_LONG(cpu->__pc);
+	cpu->__cpsr = SWAP_INT(cpu->__cpsr);
 }
 
 __private_extern__
@@ -2431,7 +2469,7 @@ __private_extern__
 void
 swap_twolevel_hint(
 struct twolevel_hint *hints,
-unsigned long nhints,
+uint32_t nhints,
 enum byte_sex target_byte_sex)
 {
     struct swapped_twolevel_hint {
@@ -2445,7 +2483,7 @@ enum byte_sex target_byte_sex)
 	} u;
     } shint;
 
-    unsigned long i;
+    uint32_t i;
     enum byte_sex host_byte_sex;
 
 	host_byte_sex = get_host_byte_sex();
@@ -2463,6 +2501,22 @@ enum byte_sex target_byte_sex)
 		shint.u.word = SWAP_INT(shint.u.word);
 		memcpy(hints + i, &shint, sizeof(struct swapped_twolevel_hint));
 	    }
+	}
+}
+
+__private_extern__
+void
+swap_data_in_code_entry(
+struct data_in_code_entry *dices,
+uint32_t ndices,
+enum byte_sex target_byte_sex)
+{
+    uint32_t i;
+
+	for(i = 0; i < ndices; i++){
+	    dices[i].offset = SWAP_INT(dices[i].offset);
+	    dices[i].length = SWAP_INT(dices[i].length);
+	    dices[i].kind = SWAP_INT(dices[i].kind);
 	}
 }
 
@@ -2504,6 +2558,17 @@ enum byte_sex target_byte_sex)
 }
 
 __private_extern__
+void
+swap_version_min_command(
+struct version_min_command *ver_cmd,
+enum byte_sex target_byte_sex)
+{
+	ver_cmd->cmd = SWAP_INT(ver_cmd->cmd);
+	ver_cmd->cmdsize = SWAP_INT(ver_cmd->cmdsize);
+	ver_cmd->version = SWAP_INT(ver_cmd->version);
+}
+
+__private_extern__
 void swap_rpath_command(
 struct rpath_command *rpath_cmd,
 enum byte_sex target_byte_sex)
@@ -2514,7 +2579,7 @@ enum byte_sex target_byte_sex)
 }
 
 __private_extern__
-void
+ void
 swap_encryption_command(
 struct encryption_info_command *ec,
 enum byte_sex target_byte_sex)
@@ -2527,13 +2592,81 @@ enum byte_sex target_byte_sex)
 }
 
 __private_extern__
+ void
+swap_encryption_command_64(
+struct encryption_info_command_64 *ec,
+enum byte_sex target_byte_sex)
+{
+	ec->cmd = SWAP_INT(ec->cmd);
+	ec->cmdsize = SWAP_INT(ec->cmdsize);
+	ec->cryptoff = SWAP_INT(ec->cryptoff);
+	ec->cryptsize = SWAP_INT(ec->cryptsize);
+	ec->cryptid = SWAP_INT(ec->cryptid);
+	ec->cryptid = SWAP_INT(ec->pad);
+}
+
+__private_extern__
+ void
+swap_linker_option_command(
+struct linker_option_command *lo,
+enum byte_sex target_byte_sex)
+{
+	lo->cmd = SWAP_INT(lo->cmd);
+	lo->cmdsize = SWAP_INT(lo->cmdsize);
+	lo->count = SWAP_INT(lo->count);
+}
+
+__private_extern__
+ void
+swap_dyld_info_command(
+struct dyld_info_command *ed,
+enum byte_sex target_byte_sex)
+{
+	ed->cmd = SWAP_INT(ed->cmd);
+	ed->cmdsize = SWAP_INT(ed->cmdsize);
+	ed->rebase_off = SWAP_INT(ed->rebase_off);
+	ed->rebase_size = SWAP_INT(ed->rebase_size);
+	ed->bind_off = SWAP_INT(ed->bind_off);
+	ed->bind_size = SWAP_INT(ed->bind_size);
+	ed->weak_bind_off = SWAP_INT(ed->weak_bind_off);
+	ed->weak_bind_size = SWAP_INT(ed->weak_bind_size);
+	ed->lazy_bind_off = SWAP_INT(ed->lazy_bind_off);
+	ed->lazy_bind_size = SWAP_INT(ed->lazy_bind_size);
+	ed->export_off = SWAP_INT(ed->export_off);
+	ed->export_size = SWAP_INT(ed->export_size);
+}
+
+__private_extern__
+void
+swap_entry_point_command(
+struct entry_point_command *ep,
+enum byte_sex target_byte_sex)
+{
+	ep->cmd = SWAP_INT(ep->cmd);
+	ep->cmdsize = SWAP_INT(ep->cmdsize);
+	ep->entryoff = SWAP_LONG_LONG(ep->entryoff);
+	ep->stacksize = SWAP_LONG_LONG(ep->stacksize);
+}
+
+__private_extern__
+void
+swap_source_version_command(
+struct source_version_command *sv,
+enum byte_sex target_byte_sex)
+{
+	sv->cmd = SWAP_INT(sv->cmd);
+	sv->cmdsize = SWAP_INT(sv->cmdsize);
+	sv->version = SWAP_LONG_LONG(sv->version);
+}
+
+__private_extern__
 void
 swap_nlist(
 struct nlist *symbols,
-unsigned long nsymbols,
+uint32_t nsymbols,
 enum byte_sex target_byte_sex)
 {
-    unsigned long i;
+    uint32_t i;
 #ifdef __MWERKS__
     enum byte_sex dummy;
         dummy = target_byte_sex;
@@ -2552,10 +2685,10 @@ __private_extern__
 void
 swap_nlist_64(
 struct nlist_64 *symbols,
-unsigned long nsymbols,
+uint32_t nsymbols,
 enum byte_sex target_byte_sex)
 {
-    unsigned long i;
+    uint32_t i;
 #ifdef __MWERKS__
     enum byte_sex dummy;
         dummy = target_byte_sex;
@@ -2574,10 +2707,10 @@ __private_extern__
 void
 swap_ranlib(
 struct ranlib *ranlibs,
-unsigned long nranlibs,
+uint32_t nranlibs,
 enum byte_sex target_byte_sex)
 {
-    unsigned long i;
+    uint32_t i;
 #ifdef __MWERKS__
     enum byte_sex dummy;
         dummy = target_byte_sex;
@@ -2591,17 +2724,33 @@ enum byte_sex target_byte_sex)
 
 __private_extern__
 void
-swap_relocation_info(
-struct relocation_info *relocs,
-unsigned long nrelocs,
+swap_ranlib_64(
+struct ranlib_64 *ranlibs,
+uint64_t nranlibs,
 enum byte_sex target_byte_sex)
 {
-    unsigned long i;
+    uint64_t i;
+
+	for(i = 0; i < nranlibs; i++){
+	    ranlibs[i].ran_un.ran_strx =
+		SWAP_LONG_LONG(ranlibs[i].ran_un.ran_strx);
+	    ranlibs[i].ran_off = SWAP_LONG_LONG(ranlibs[i].ran_off);
+	}
+}
+
+__private_extern__
+void
+swap_relocation_info(
+struct relocation_info *relocs,
+uint32_t nrelocs,
+enum byte_sex target_byte_sex)
+{
+    uint32_t i;
     enum byte_sex host_byte_sex;
     enum bool to_host_byte_sex, scattered;
 
     struct swapped_relocation_info {
-	long	r_address;
+	int32_t r_address;
 	union {
 	    struct {
 		unsigned int
@@ -2617,7 +2766,7 @@ enum byte_sex target_byte_sex)
 
     struct swapped_scattered_relocation_info {
 	uint32_t word;
-	long	r_value;
+	int32_t	r_value;
     } *ssr;
 
 	host_byte_sex = get_host_byte_sex();
@@ -2669,7 +2818,7 @@ uint32_t *indirect_symbols,
 uint32_t nindirect_symbols,
 enum byte_sex target_byte_sex)
 {
-    unsigned long i;
+    uint32_t i;
 #ifdef __MWERKS__
     enum byte_sex dummy;
         dummy = target_byte_sex;
@@ -2683,7 +2832,7 @@ __private_extern__
 void
 swap_dylib_reference(
 struct dylib_reference *refs,
-unsigned long nrefs,
+uint32_t nrefs,
 enum byte_sex target_byte_sex)
 {
     struct swapped_dylib_reference {
@@ -2697,7 +2846,7 @@ enum byte_sex target_byte_sex)
 	} u;
     } sref;
 
-    unsigned long i;
+    uint32_t i;
     enum byte_sex host_byte_sex;
 
 	host_byte_sex = get_host_byte_sex();
@@ -2723,10 +2872,10 @@ __private_extern__
 void
 swap_dylib_module(
 struct dylib_module *mods,
-unsigned long nmods,
+uint32_t nmods,
 enum byte_sex target_byte_sex)
 {
-    unsigned long i;
+    uint32_t i;
 #ifdef __MWERKS__
     enum byte_sex dummy;
         dummy = target_byte_sex;
@@ -2755,10 +2904,10 @@ __private_extern__
 void
 swap_dylib_module_64(
 struct dylib_module_64 *mods,
-unsigned long nmods,
+uint32_t nmods,
 enum byte_sex target_byte_sex)
 {
-    unsigned long i;
+    uint32_t i;
 #ifdef __MWERKS__
     enum byte_sex dummy;
         dummy = target_byte_sex;
@@ -2787,10 +2936,10 @@ __private_extern__
 void
 swap_dylib_table_of_contents(
 struct dylib_table_of_contents *tocs,
-unsigned long ntocs,
+uint32_t ntocs,
 enum byte_sex target_byte_sex)
 {
-    unsigned long i;
+    uint32_t i;
 #ifdef __MWERKS__
     enum byte_sex dummy;
         dummy = target_byte_sex;
@@ -2800,4 +2949,19 @@ enum byte_sex target_byte_sex)
 	    tocs[i].symbol_index = SWAP_INT(tocs[i].symbol_index);
 	    tocs[i].module_index = SWAP_INT(tocs[i].module_index);
 	}
+}
+
+__private_extern__
+void
+swap_xar_header(
+struct xar_header *xar,
+enum byte_sex target_byte_sex)
+{
+	xar->magic = SWAP_INT(xar->magic);
+	xar->size = SWAP_SHORT(xar->size);
+	xar->version = SWAP_SHORT(xar->version);
+	xar->toc_length_compressed = SWAP_LONG_LONG(xar->toc_length_compressed);
+	xar->toc_length_uncompressed =
+				SWAP_LONG_LONG(xar->toc_length_uncompressed);
+	xar->cksum_alg = SWAP_INT(xar->cksum_alg);
 }

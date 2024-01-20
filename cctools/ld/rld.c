@@ -64,6 +64,7 @@ extern const struct section *getsectbynamefromheader(
 #endif /* KLD */
 #include <mach-o/rld_state.h>
 #include <mach-o/ldsyms.h>
+#define __darwin_i386_float_state i386_float_state
 #include "stuff/arch.h"
 #include "stuff/best_arch.h"
 
@@ -100,7 +101,7 @@ extern const struct section *getsectbynamefromheader(
  * The user's address function to be called in layout to get the address of
  * where to link edit the result.
  */
-extern
+__private_extern__
 unsigned long (*address_func)(unsigned long size, unsigned long headers_size) =
 									   NULL;
 
@@ -122,7 +123,7 @@ static void (*rld_monaddition)(char *lowpc, char *highpc) = NULL;
  * can call the address_func (above) with the allocated_size of memory
  * (including the symbol table) so that it can deallocate it correctly.
  */
-extern long RLD_DEBUG_OUTPUT_FILENAME_flag = 0;
+__private_extern__ long RLD_DEBUG_OUTPUT_FILENAME_flag = 0;
 
 #ifndef KLD
 /*
@@ -154,7 +155,7 @@ static volatile int fatals = 0;
  * The base file name passed to rld_load_basefile() if it has been called.
  * This points at an allocated copy of the name.
  */
-extern char *base_name = NULL;
+__private_extern__ char *base_name = NULL;
 
 #if !defined(SA_RLD) && !(defined(KLD) && defined(__STATIC__))
 /* 
@@ -168,6 +169,24 @@ static struct rld_loaded_state *rld_loaded_state = NULL;
 static void rld_loaded_state_changed(void);
 #define NSTATES_INCREMENT 10
 #endif /* !defined(SA_RLD) && !(defined(KLD) && defined(__STATIC__)) */
+
+#ifdef KLD
+/* hook for kext tools to set target byte order */
+void
+kld_set_byteorder(enum NXByteOrder order)
+{
+    switch (order) {
+	case NX_BigEndian:
+	target_byte_sex = BIG_ENDIAN_BYTE_SEX;
+	break;
+    case NX_LittleEndian:
+	target_byte_sex = LITTLE_ENDIAN_BYTE_SEX;
+	break;
+    default:
+	target_byte_sex = UNKNOWN_BYTE_SEX;
+    }
+}
+#endif
 
 /* The internal routine that implements rld_load_basefiles()'s */
 #ifdef KLD
@@ -247,8 +266,8 @@ const char *output_filename)
  * argument.  Errors for the kld api's are done through kld_error_vprintf()
  * which kextload(8) provides.
  * 
- * Note thes symbols are really extern and done by the "nmedit -p"
- * command in the Makefile so that the other extern symbols can be
+ * Note thes symbols are really __private_extern__ and done by the "nmedit -p"
+ * command in the Makefile so that the other __private_extern__ symbols can be
  * hidden by the "ld -r" first.
  */
 long
@@ -311,8 +330,8 @@ const char *output_filename)
  * does not produce an output file. Errors for the kld api's are done through
  * kld_error_vprintf() which /mach_kernel provides.
  * 
- * Note this symbol is really extern and done by the "nmedit -p"
- * command in the Makefile so that the other extern symbols can be
+ * Note this symbol is really __private_extern__ and done by the "nmedit -p"
+ * command in the Makefile so that the other __private_extern__ symbols can be
  * hidden by the "ld -r" first.
  */
 long
@@ -458,7 +477,7 @@ long obj_size)
 	     *     libsa/stdlib.h
 	     * if it exists on the system.
 	     */
-	    extern const char *kld_basefile_name;
+	    __private_extern__ const char *kld_basefile_name;
 #endif /* !defined(_LIBSA_STDLIB_H_) */
 #else /* !defined(KLD) */
 	    extern char **NXArgv;
@@ -493,7 +512,8 @@ long obj_size)
 				   NULL, 0, NULL, 0);
 #endif /* !defined(__DYNAMIC__) */
 #endif /* !defined(__OPENSTEP__) && !defined(KLD) */
-	    target_byte_sex = host_byte_sex;
+	    if (target_byte_sex == UNKNOWN_BYTE_SEX)
+		target_byte_sex = host_byte_sex;
 	    /*
 	     * If there were any errors in processing the base program it is
 	     * treated as a fatal error and no futher processing is done.
@@ -648,8 +668,8 @@ long obj_size)
 	     * any whole pages.
 	     */
 	    if (strip_level == STRIP_ALL)
-		deallocate_size = round(output_size + symbol_size, host_pagesize) -
-				round(output_size, host_pagesize);
+		deallocate_size = rnd(output_size + symbol_size, host_pagesize) -
+				rnd(output_size, host_pagesize);
 	    else {
 		deallocate_size = 0;
 		sets[cur_set].output_size += symbol_size;
@@ -658,14 +678,14 @@ long obj_size)
 	    if(deallocate_size > 0){
 		if((r = vm_deallocate(mach_task_self(),
 				      (vm_address_t)(output_addr +
-				      round(output_size, host_pagesize)),
+				      rnd(output_size, host_pagesize)),
 				      deallocate_size)) != KERN_SUCCESS)
 		    mach_fatal(r, "can't vm_deallocate() buffer for output "
 			       "file's symbol table");
 #ifdef RLD_VM_ALLOC_DEBUG
 		print("rld() vm_deallocate: addr = 0x%0x size = 0x%x\n",
 		      (unsigned int)(output_addr +
-				     round(output_size, host_pagesize)),
+				     rnd(output_size, host_pagesize)),
 		      (unsigned int)deallocate_size);
 #endif /* RLD_VM_ALLOC_DEBUG */
 	    }
@@ -1690,7 +1710,7 @@ deallocate_and_return:
 #ifdef RLD_VM_ALLOC_DEBUG
 	print("rld() vm_deallocate: addr = 0x%0x size = 0x%x\n",
 	      (unsigned int)(output_addr), output_size);
-			     round(output_size, host_pagesize)),
+			     rnd(output_size, host_pagesize)),
 	      (unsigned int)deallocate_size);
 #endif /* RLD_VM_ALLOC_DEBUG */
 	return(return_value);
@@ -1821,7 +1841,7 @@ unsigned long link_options)
 /*
  * cleanup() is called by all routines handling fatal errors.
  */
-extern
+__private_extern__
 void
 cleanup(void)
 {
@@ -1833,7 +1853,7 @@ cleanup(void)
 /*
  * All printing of all messages goes through this function.
  */
-extern
+__private_extern__
 void
 vprint(
 const char *format,
@@ -1849,7 +1869,7 @@ NXVPrintf(error_stream, format, ap);
 /*
  * All printing of all messages goes through this function.
  */
-extern
+__private_extern__
 void
 vprint(
 const char *format,
@@ -1864,7 +1884,7 @@ va_list ap)
  * allocate() is just a wrapper around malloc that prints and error message and
  * exits if the malloc fails.
  */
-extern
+__private_extern__
 void *
 allocate(
 unsigned long size)
@@ -1888,7 +1908,7 @@ unsigned long size)
  * reallocate() is just a wrapper around realloc that prints and error message
  * and exits if the realloc fails.
  */
-extern
+__private_extern__
 void *
 reallocate(
 void *p,
@@ -1913,8 +1933,8 @@ unsigned long size)
  * These two variables are set in sa_rld() and used in layout_segments()
  * as the place to put the output in memory.
  */
-extern char         *sa_rld_output_addr = NULL;
-extern unsigned long sa_rld_output_size = 0;
+__private_extern__ char         *sa_rld_output_addr = NULL;
+__private_extern__ unsigned long sa_rld_output_size = 0;
 
 /*
  * These two variables are set in sa_rld() and used in vprint() (defined in this
@@ -2019,7 +2039,8 @@ unsigned long      strsize)         /* sizeof the string table */
 		merge_base_program(basefile_name, basefile_addr, NULL,
 				   symtab, nsyms, strtab, strsize);
 	    }
-	    target_byte_sex = host_byte_sex;
+	    if (target_byte_sex == UNKNOWN_BYTE_SEX)
+		target_byte_sex = host_byte_sex;
 	    /*
 	     * If there were any errors in processing the base program it is
 	     * treated as a fatal error and no futher processing is done.
@@ -2129,7 +2150,7 @@ unsigned long      strsize)         /* sizeof the string table */
 /*
  * All printing of all SA_RLD messages goes through this function.
  */
-extern
+__private_extern__
 void
 vprint(
 const char *format,
@@ -2150,7 +2171,7 @@ va_list ap)
  * allocate() is just a wrapper around malloc that prints and error message and
  * exits if the malloc fails.
  */
-extern
+__private_extern__
 void *
 allocate(
 unsigned long size)
@@ -2168,7 +2189,7 @@ unsigned long size)
  * reallocate() is just a wrapper around realloc that prints and error message
  * and exits if the realloc fails.
  */
-extern
+__private_extern__
 void *
 reallocate(
 void *p,
@@ -2186,7 +2207,7 @@ unsigned long size)
  * savestr() malloc's space for the string passed to it, copys the string into
  * the space and returns a pointer to that space.
  */
-extern
+__private_extern__
 char *
 savestr(
 const char *s)
@@ -2204,7 +2225,7 @@ const char *s)
 /*
  * The Kernel framework does not provide this API so we have a copy here.
  */
-extern
+__private_extern__
 struct mach_header *
 _NSGetMachExecuteHeader(void)
 {

@@ -22,11 +22,10 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
 #include <limits.h>
 #include <time.h>
-#include <stdlib.h>
+#include <libc.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <mach-o/nlist.h>
@@ -34,7 +33,7 @@
 #include "stuff/hash_string.h"
 #include "stuff/allocate.h"
 #include "stuff/errors.h"
-#include "stuff/round.h"
+#include "stuff/rnd.h"
 #include "stuff/reloc.h"
 
 char *progname = NULL;	/* name of the program for error messages (argv[0]) */
@@ -51,7 +50,7 @@ char **list_filenames = NULL;
  */
 struct symbol {
     char *name;			/* name of the symbol */
-    long type;			/* type of this symbol (N_INDR or N_UNDF) */
+    int32_t type;		/* type of this symbol (N_INDR or N_UNDF) */
     char *indr;			/* name for indirection if N_INDR type */
     struct indr_object *io;	/* pointer to indr_object for this */
     struct symbol *next;	/* next symbol in the hash chain */
@@ -70,7 +69,7 @@ struct indr_object {
     char *indr;			/* the name of the indirect symbol */
     char *undef;		/* the name of the undefined symbol */
     enum bool existing_symbol;
-    unsigned long index;
+    uint32_t index;
 };
 
 /*
@@ -83,8 +82,8 @@ struct indr_object {
 #define INITIAL_LIST_SIZE	250
 struct list {
     struct indr_object **list;	/* the order list */
-    unsigned long used;		/* the number used in the list */
-    unsigned long size;		/* the current size of the list */
+    uint32_t used;		/* the number used in the list */
+    uint32_t size;		/* the current size of the list */
 };
 static struct list indr_list;
 
@@ -95,13 +94,13 @@ static struct list indr_list;
 #define INITIAL_STRING_TABLE_SIZE	40960
 static struct {
     char *strings;
-    unsigned long size;
-    unsigned long index;
+    uint32_t size;
+    uint32_t index;
 } string_table;
 
 struct undef_map {
     enum bool old_symbol;
-    unsigned long index;
+    uint32_t index;
     struct nlist symbol;
 };
 static struct undef_map *undef_map;
@@ -117,9 +116,9 @@ static void process_list(
 
 static void translate_input(
     struct arch *archs,
-    unsigned long narchs,
+    uint32_t narchs,
     struct arch_flag *arch_flags,
-    unsigned long narch_flags,
+    uint32_t narch_flags,
     enum bool all_archs,
     enum bool nflag);
 
@@ -145,7 +144,7 @@ static void make_indr_objects(
 
 static void enter_symbol(
     char *name,
-    long type,
+    int32_t type,
     char *indr,
     struct indr_object *io);
 
@@ -161,7 +160,7 @@ static struct indr_object *enter_object(
 static void start_string_table(
     void);
 
-static long add_to_string_table(
+static int32_t add_to_string_table(
     char *p);
 
 static void end_string_table(
@@ -170,6 +169,10 @@ static void end_string_table(
 static void add_list(
     struct list *list,
     struct indr_object *item);
+
+/* apple_version is created by the libstuff/Makefile */
+extern char apple_version[];
+char *version = apple_version;
 
 /*
  * The indr(l) program takes the following options:
@@ -192,15 +195,15 @@ char *argv[],
 char *envp[])
 {
     int i;
-    unsigned long j;
+    uint32_t j;
     enum bool no_flags_left;
     char *list_filename, *output_file, *input_file;
     struct arch_flag *arch_flags;
-    unsigned long narch_flags;
+    uint32_t narch_flags;
     enum bool all_archs;
     enum bool nflag;
     struct arch *archs;
-    unsigned long narchs;
+    uint32_t narchs;
     struct stat stat_buf;
 
 	progname = argv[0];
@@ -349,7 +352,7 @@ char *envp[])
 	if(stat(input_file, &stat_buf) == -1)
 	    system_error("can't stat input file: %s", input_file);
 	writeout(archs, narchs, output_file, stat_buf.st_mode & 0777, TRUE,
-		 FALSE, FALSE, NULL);
+		 FALSE, FALSE, FALSE, NULL);
 
 	if(errors)
 	    return(EXIT_FAILURE);
@@ -386,7 +389,7 @@ enum bool nflag)
 {
 	FILE *list;
 	char buf[BUFSIZ], *symbol_name, *_symbol_name, *membername;
-	long i, len, symbol_number;
+	int32_t i, len, symbol_number;
 	struct indr_object *io;
 
 	/*
@@ -413,7 +416,7 @@ enum bool nflag)
 	    _symbol_name = makestr("_", symbol_name, NULL);
 
 	    if(nflag == FALSE){
-		sprintf(buf, "%05ld", symbol_number++);
+		sprintf(buf, "%05d", symbol_number++);
 		membername = makestr("INDR", buf, ".o", NULL);
 		io = enter_object(membername, symbol_name, _symbol_name,
 				  &indr_list);
@@ -436,18 +439,20 @@ static
 void
 translate_input(
 struct arch *archs,
-unsigned long narchs,
+uint32_t narchs,
 struct arch_flag *arch_flags,
-unsigned long narch_flags,
+uint32_t narch_flags,
 enum bool all_archs,
 enum bool nflag)
 {
-    unsigned long i, j, offset, size;
+    uint32_t i, j, offset, size;
     cpu_type_t cputype;
     cpu_subtype_t cpusubtype;
     struct arch_flag host_arch_flag;
     enum bool arch_process, any_processing, *arch_flag_processed;
     char *list_filename;
+    struct ar_hdr h;
+    char size_buf[sizeof(h.ar_size) + 1];
 
 	arch_flag_processed = NULL;
 	/*
@@ -476,6 +481,10 @@ enum bool nflag)
 	    else if(archs[i].type == OFILE_Mach_O){
 		cputype = archs[i].object->mh_cputype;
 		cpusubtype = archs[i].object->mh_cpusubtype;
+	    }
+	    else if(archs[i].fat_arch64 != NULL){
+		cputype = archs[i].fat_arch64->cputype;
+		cpusubtype = archs[i].fat_arch64->cpusubtype;
 	    }
 	    else if(archs[i].fat_arch != NULL){
 		cputype = archs[i].fat_arch->cputype;
@@ -539,23 +548,23 @@ enum bool nflag)
 		    archs[i].members[j].offset = offset;
 		    size = 0;
 		    if(archs[i].members[j].member_long_name == TRUE){
-			size = round(archs[i].members[j].member_name_size,
-				     sizeof(long));
+			size = rnd(archs[i].members[j].member_name_size,
+				     sizeof(int32_t));
 			archs[i].toc_long_name = TRUE;
 		    }
 		    if(archs[i].members[j].object != NULL){
 			size += archs[i].members[j].object->object_size
 			   - archs[i].members[j].object->input_sym_info_size
 			   + archs[i].members[j].object->output_sym_info_size;
-			sprintf(archs[i].members[j].ar_hdr->ar_size, "%-*ld",
-			       (int)sizeof(archs[i].members[j].ar_hdr->ar_size),
-			       (long)(size));
+			sprintf(size_buf, "%-*ld",
+			   (int)sizeof(archs[i].members[j].ar_hdr->ar_size),
+			   (long)(size));
 			/*
 			 * This has to be done by hand because sprintf puts a
 			 * null at the end of the buffer.
 			 */
-			memcpy(archs[i].members[j].ar_hdr->ar_fmag, ARFMAG,
-			      (int)sizeof(archs[i].members[j].ar_hdr->ar_fmag));
+			memcpy(archs[i].members[j].ar_hdr->ar_size, size_buf,
+			   (int)sizeof(archs[i].members[j].ar_hdr->ar_size));
 		    }
 		    else{
 			size += archs[i].members[j].unknown_size;
@@ -597,16 +606,16 @@ struct member *member,
 struct object *object)
 {
 
-    unsigned long i, j;
+    uint32_t i, j;
 
     enum byte_sex host_byte_sex;
     struct nlist *symbols, *nlistp;
-    unsigned long nsyms, offset;
+    uint32_t nsyms, offset;
     char *strings;
-    unsigned long strings_size;
+    uint32_t strings_size;
     struct symbol *sp;
 
-    long new_nsyms;
+    int32_t new_nsyms;
     struct nlist *new_symbols;
 
 	if(object->mh_filetype == MH_DYLIB ||
@@ -636,7 +645,7 @@ struct object *object)
 				      object->st->strsize;
 	if(object->dyst != NULL){
 	    object->input_sym_info_size +=
-		    object->dyst->nindirectsyms * sizeof(unsigned long);
+		    object->dyst->nindirectsyms * sizeof(uint32_t);
 	}
 
 	/*
@@ -651,7 +660,7 @@ struct object *object)
 	    if(nlistp->n_type & N_EXT){
 		if(nlistp->n_un.n_strx){
 		    if(nlistp->n_un.n_strx > 0 &&
-		       (unsigned long)nlistp->n_un.n_strx < strings_size){
+		       (uint32_t)nlistp->n_un.n_strx < strings_size){
 			sp = lookup_symbol(strings + nlistp->n_un.n_strx);
 			if(sp != NULL){
 			    if(sp->type == N_UNDF)
@@ -667,18 +676,18 @@ struct object *object)
 		    }
 		    else
 			fatal_arch(arch, member, "bad string table "
-				    "index in symbol %lu in: ", i);
+				    "index in symbol %u in: ", i);
 		}
 	    }
 	    else{
 		if(nlistp->n_un.n_strx){
 		    if(nlistp->n_un.n_strx > 0 && nlistp->n_un.n_strx <
-							    (long)strings_size)
+							(int32_t)strings_size)
 			nlistp->n_un.n_strx = add_to_string_table(
 				strings + nlistp->n_un.n_strx);
 		    else
 			fatal_arch(arch, member, "bad string table "
-				    "index in symbol %lu in: ", i);
+				    "index in symbol %u in: ", i);
 		}
 	    }
 	    nlistp++;
@@ -736,7 +745,7 @@ struct object *object)
 		string_table.index;
 	if(object->dyst != NULL){
 	    object->output_sym_info_size +=
-		    object->dyst->nindirectsyms * sizeof(unsigned long);
+		    object->dyst->nindirectsyms * sizeof(uint32_t);
 	}
 
 	if(object->seg_linkedit != NULL){
@@ -749,7 +758,7 @@ struct object *object)
 	    object->st->nsyms = nsyms;
 	    object->st->strsize = string_table.index;
 
-	    offset = ULONG_MAX;
+	    offset = UINT_MAX;
 	    if(object->st->nsyms != 0 &&
 	       object->st->symoff < offset)
 		offset = object->st->symoff;
@@ -802,39 +811,39 @@ struct arch *arch,
 struct object *object)
 {
     enum byte_sex host_byte_sex;
-    unsigned long i, inew_syms, inew_undefsyms, inew_mods, indr_iextdefsym;
-    unsigned long new_ext_strsize, len, offset;
-    unsigned long *map;
+    uint32_t i, inew_syms, inew_undefsyms, inew_mods, indr_iextdefsym;
+    uint32_t new_ext_strsize, len, offset;
+    uint32_t *map;
     struct symbol *sp;
     char *p, *q;
     struct scattered_relocation_info *sreloc;
 
     struct nlist *symbols;
-    unsigned long nsyms;
+    uint32_t nsyms;
     char *strings;
-    unsigned long strsize;
+    uint32_t strsize;
     struct dylib_table_of_contents *tocs;
-    unsigned long ntoc;
+    uint32_t ntoc;
     struct dylib_module *mods;
-    unsigned long nmodtab;
+    uint32_t nmodtab;
     struct dylib_reference *refs;
-    unsigned long nextrefsyms;
+    uint32_t nextrefsyms;
     struct relocation_info *ext_relocs;
     uint32_t *indirect_symtab;
 
     struct nlist *new_symbols;
-    unsigned long new_nsyms;
+    uint32_t new_nsyms;
     char *new_strings;
-    unsigned long new_strsize;
-    unsigned long new_nlocalsym;
-    unsigned long new_nextdefsym;
-    unsigned long new_nundefsym;
+    uint32_t new_strsize;
+    uint32_t new_nlocalsym;
+    uint32_t new_nextdefsym;
+    uint32_t new_nundefsym;
     struct dylib_table_of_contents *new_tocs;
-    unsigned long new_ntoc;
+    uint32_t new_ntoc;
     struct dylib_module *new_mods;
-    unsigned long new_nmodtab;
+    uint32_t new_nmodtab;
     struct dylib_reference *new_refs;
-    unsigned long new_nextrefsyms;
+    uint32_t new_nextrefsyms;
 
 
 	/*
@@ -886,17 +895,16 @@ struct object *object)
 	 * the symbols can be renamed.
 	 */
 	new_nsyms = 0;
-	new_strsize = sizeof(long);
+	new_strsize = sizeof(int32_t);
 	new_nlocalsym = 0;
 	new_nextdefsym = 0;
 	new_nundefsym = 0;
 	new_ext_strsize = 0;
 	for(i = 0; i < nsyms; i++){
 	    if(symbols[i].n_un.n_strx != 0){
-		if(symbols[i].n_un.n_strx < 0 ||
-		   (unsigned long)symbols[i].n_un.n_strx > strsize){
+		if((uint32_t)symbols[i].n_un.n_strx > strsize){
 		    error_arch(arch, NULL, "bad string index for symbol "
-			       "table entry %ld in: ", i);
+			       "table entry %d in: ", i);
 		    return;
 		}
 	    }
@@ -904,7 +912,7 @@ struct object *object)
 		if(symbols[i].n_value != 0){
 		    if(symbols[i].n_value > strsize){
 			error_arch(arch, NULL, "bad string index for "
-				   "indirect symbol table entry %ld in: ", i);
+				   "indirect symbol table entry %d in: ", i);
 			return;
 		    }
 		}
@@ -972,7 +980,7 @@ struct object *object)
 	    if(mods[i].module_name == 0 ||
 	       mods[i].module_name > strsize){
 		error_arch(arch, NULL, "bad string index for module_name "
-			   "of module table entry %ld in: ", i);
+			   "of module table entry %d in: ", i);
 		return;
 	    }
 	    len = strlen(strings + mods[i].module_name) + 1;
@@ -1010,14 +1018,14 @@ struct object *object)
 	 * Second pass, create the new tables.
 	 */
 	new_symbols =(struct nlist *)allocate(new_nsyms * sizeof(struct nlist));
-	new_strsize = round(new_strsize, sizeof(long));
+	new_strsize = rnd(new_strsize, sizeof(int32_t));
 	new_strings = (char *)allocate(new_strsize);
 	new_strings[new_strsize - 3] = '\0';
 	new_strings[new_strsize - 2] = '\0';
 	new_strings[new_strsize - 1] = '\0';
 
-	memset(new_strings, '\0', sizeof(long));
-	p = new_strings + sizeof(long);
+	memset(new_strings, '\0', sizeof(int32_t));
+	p = new_strings + sizeof(int32_t);
 	q = p + new_ext_strsize;
 
 	/*
@@ -1030,8 +1038,8 @@ struct object *object)
 	 *	external strings
 	 *	local strings
 	 */
-	map = (unsigned long *)allocate(nsyms * sizeof(unsigned long));
-	memset(map, '\0', nsyms * sizeof(unsigned long));
+	map = (uint32_t *)allocate(nsyms * sizeof(uint32_t));
+	memset(map, '\0', nsyms * sizeof(uint32_t));
 	inew_syms = 0;
 	for(i = 0; i < nsyms; i++){ /* loop for local symbols */
 	    if((symbols[i].n_type & N_EXT) == 0){
@@ -1221,13 +1229,13 @@ struct object *object)
 	       ext_relocs[i].r_extern == 1){
 		if(ext_relocs[i].r_symbolnum > nsyms){
 		    fatal_arch(arch, NULL, "bad r_symbolnum for external "
-			"relocation entry %ld in: ", i);
+			"relocation entry %d in: ", i);
 		}
 		ext_relocs[i].r_symbolnum = map[ext_relocs[i].r_symbolnum];
 	    }
 	    else{
 		fatal_arch(arch, NULL, "bad external relocation entry "
-		    "%ld (not external) in: ", i);
+		    "%d (not external) in: ", i);
 	    }
 	    if((ext_relocs[i].r_address & R_SCATTERED) == 0){
 		if(reloc_has_pair(object->mh_cputype, ext_relocs[i].r_type))
@@ -1247,7 +1255,7 @@ struct object *object)
 	    if(indirect_symtab[i] != INDIRECT_SYMBOL_LOCAL &&
 	       indirect_symtab[i] != INDIRECT_SYMBOL_ABS){
 		if(indirect_symtab[i] > nsyms)
-		    fatal_arch(arch, NULL, "indirect symbol table entry %ld "
+		    fatal_arch(arch, NULL, "indirect symbol table entry %d "
 			"(past the end of the symbol table) in: ", i);
 		indirect_symtab[i] = map[indirect_symtab[i]];
 	    }
@@ -1260,7 +1268,7 @@ struct object *object)
 	object->input_sym_info_size =
 	    object->dyst->nlocrel * sizeof(struct relocation_info) +
 	    object->dyst->nextrel * sizeof(struct relocation_info) +
-	    object->dyst->nindirectsyms * sizeof(unsigned long) +
+	    object->dyst->nindirectsyms * sizeof(uint32_t) +
 	    nsyms * sizeof(struct nlist) +
 	    strsize +
 	    ntoc * sizeof(struct dylib_table_of_contents)+
@@ -1270,7 +1278,7 @@ struct object *object)
 	object->output_sym_info_size =
 	    object->dyst->nlocrel * sizeof(struct relocation_info) +
 	    object->dyst->nextrel * sizeof(struct relocation_info) +
-	    object->dyst->nindirectsyms * sizeof(unsigned long) +
+	    object->dyst->nindirectsyms * sizeof(uint32_t) +
 	    new_nsyms * sizeof(struct nlist) +
 	    new_strsize +
 	    new_ntoc * sizeof(struct dylib_table_of_contents)+
@@ -1282,6 +1290,34 @@ struct object *object)
 	    object->output_sym_info_size += object->split_info_cmd->datasize;
 	}
 
+	if(object->func_starts_info_cmd != NULL){
+	    object->input_sym_info_size +=
+		object->func_starts_info_cmd->datasize;
+	    object->output_sym_info_size +=
+		object->func_starts_info_cmd->datasize;
+	}
+
+	if(object->data_in_code_cmd != NULL){
+	    object->input_sym_info_size +=
+		object->data_in_code_cmd->datasize;
+	    object->output_sym_info_size +=
+		object->data_in_code_cmd->datasize;
+	}
+
+	if(object->code_sign_drs_cmd != NULL){
+	    object->input_sym_info_size +=
+		object->code_sign_drs_cmd->datasize;
+	    object->output_sym_info_size +=
+		object->code_sign_drs_cmd->datasize;
+	}
+
+	if(object->link_opt_hint_cmd != NULL){
+	    object->input_sym_info_size +=
+		object->link_opt_hint_cmd->datasize;
+	    object->output_sym_info_size +=
+		object->link_opt_hint_cmd->datasize;
+	}
+
 	if(object->hints_cmd != NULL){ 
 	    object->input_sym_info_size +=
 		object->hints_cmd->nhints * sizeof(struct twolevel_hint);
@@ -1291,11 +1327,11 @@ struct object *object)
 
 	if(object->code_sig_cmd != NULL){
 	    object->input_sym_info_size =
-		round(object->input_sym_info_size, 16);
+		rnd(object->input_sym_info_size, 16);
 	    object->input_sym_info_size +=
 		object->code_sig_cmd->datasize;
 	    object->output_sym_info_size =
-		round(object->output_sym_info_size, 16);
+		rnd(object->output_sym_info_size, 16);
 	    object->output_sym_info_size +=
 		object->code_sig_cmd->datasize;
 	}
@@ -1323,6 +1359,30 @@ struct object *object)
 	    (object->object_addr + object->split_info_cmd->dataoff);
 	    object->output_split_info_data_size = 
 		object->split_info_cmd->datasize;
+	}
+	if(object->func_starts_info_cmd != NULL){
+	    object->output_func_start_info_data = 
+	    (object->object_addr + object->func_starts_info_cmd->dataoff);
+	    object->output_func_start_info_data_size = 
+		object->func_starts_info_cmd->datasize;
+	}
+	if(object->data_in_code_cmd != NULL){
+	    object->output_data_in_code_info_data = 
+	    (object->object_addr + object->data_in_code_cmd->dataoff);
+	    object->output_data_in_code_info_data_size = 
+		object->data_in_code_cmd->datasize;
+	}
+	if(object->code_sign_drs_cmd != NULL){
+	    object->output_code_sign_drs_info_data = 
+	    (object->object_addr + object->code_sign_drs_cmd->dataoff);
+	    object->output_code_sign_drs_info_data_size = 
+		object->code_sign_drs_cmd->datasize;
+	}
+	if(object->link_opt_hint_cmd != NULL){
+	    object->output_link_opt_hint_info_data = 
+	    (object->object_addr + object->link_opt_hint_cmd->dataoff);
+	    object->output_link_opt_hint_info_data_size = 
+		object->link_opt_hint_cmd->datasize;
 	}
 	object->output_ext_relocs = ext_relocs;
 	object->output_indirect_symtab = indirect_symtab;
@@ -1373,6 +1433,22 @@ struct object *object)
 	    object->split_info_cmd->dataoff = offset;
 	    offset += object->split_info_cmd->datasize;
 	}
+	if(object->func_starts_info_cmd != NULL){
+	    object->func_starts_info_cmd->dataoff = offset;
+	    offset += object->func_starts_info_cmd->datasize;
+	}
+	if(object->data_in_code_cmd != NULL){
+	    object->data_in_code_cmd->dataoff = offset;
+	    offset += object->data_in_code_cmd->datasize;
+	}
+	if(object->code_sign_drs_cmd != NULL){
+	    object->code_sign_drs_cmd->dataoff = offset;
+	    offset += object->code_sign_drs_cmd->datasize;
+	}
+	if(object->link_opt_hint_cmd != NULL){
+	    object->link_opt_hint_cmd->dataoff = offset;
+	    offset += object->link_opt_hint_cmd->datasize;
+	}
 	if(object->st->nsyms != 0){
 	    object->st->symoff = offset;
 	    offset += object->st->nsyms * sizeof(struct nlist);
@@ -1390,7 +1466,7 @@ struct object *object)
 	}
 	if(object->dyst->nindirectsyms != 0){
 	    object->dyst->indirectsymoff = offset;
-	    offset += object->dyst->nindirectsyms * sizeof(unsigned long);
+	    offset += object->dyst->nindirectsyms * sizeof(uint32_t);
 	}
 	if(object->dyst->ntoc != 0){
 	    object->dyst->tocoff = offset;
@@ -1411,7 +1487,7 @@ struct object *object)
 	    offset += object->st->strsize;
 	}
 	if(object->code_sig_cmd != NULL){
-	    offset = round(offset, 16);
+	    offset = rnd(offset, 16);
 	    object->code_sig_cmd->dataoff = offset;
 	    offset += object->code_sig_cmd->datasize;
 	}
@@ -1455,18 +1531,18 @@ void
 make_indr_objects(
 struct arch *arch)
 {
-    unsigned long i;
+    int32_t i;
     cpu_type_t cputype;
     cpu_subtype_t cpusubtype;
     enum byte_sex target_byte_sex;
     struct indr_object *io;
     struct nlist *output_symbols, *undef, *indr;
     char *output_strings, *object_addr;
-    unsigned long object_size;
+    uint32_t object_size;
     struct mach_header *mh;
     struct symtab_command *st;
     struct ar_hdr *ar_hdr;
-    unsigned long indr_time, size;
+    uint32_t indr_time, size;
     unsigned short indr_mode;
     int oumask;
     gid_t gid;
@@ -1613,11 +1689,11 @@ static
 void
 enter_symbol(
 char *name,
-long type,
+int32_t type,
 char *indr,
 struct indr_object *io)
 {
-    long hash_key;
+    int32_t hash_key;
     struct symbol *sp;
 
 	hash_key = hash_string(name) % SYMBOL_HASH_SIZE;
@@ -1649,7 +1725,7 @@ struct symbol *
 lookup_symbol(
 char *name)
 {
-    long hash_key;
+    int32_t hash_key;
     struct symbol *sp;
 
 	hash_key = hash_string(name) % SYMBOL_HASH_SIZE;
@@ -1705,8 +1781,8 @@ start_string_table()
 	    string_table.size = INITIAL_STRING_TABLE_SIZE;
 	    string_table.strings = (char *)allocate(string_table.size);
 	}
-	memset(string_table.strings, '\0', sizeof(long));
-	string_table.index = sizeof(long);
+	memset(string_table.strings, '\0', sizeof(int32_t));
+	string_table.index = sizeof(int32_t);
 }
 
 /*
@@ -1714,11 +1790,11 @@ start_string_table()
  * returns the index of the string in the table.
  */
 static
-long
+int32_t
 add_to_string_table(
 char *p)
 {
-    long len, index;
+    int32_t len, index;
 
 	len = strlen(p) + 1;
 	if(string_table.size < string_table.index + len){
@@ -1740,9 +1816,9 @@ static
 void
 end_string_table()
 {
-    unsigned long length;
+    uint32_t length;
 
-	length = round(string_table.index, sizeof(unsigned long));
+	length = rnd(string_table.index, sizeof(uint32_t));
 	memset(string_table.strings + string_table.index, '\0',
 	       length - string_table.index);
 	string_table.index = length;

@@ -71,7 +71,7 @@
 char *progname = NULL;
 
 struct flags {
-    unsigned long nfiles;
+    uint32_t nfiles;
     enum bool m;
     enum bool l;
     enum bool x;
@@ -84,6 +84,10 @@ static void size(
     char *arch_name,
     void *cookie);
 
+/* apple_version is created by the libstuff/Makefile */
+extern char apple_version[];
+char *version = apple_version;
+
 int
 main(
 int argc,
@@ -94,7 +98,7 @@ char **envp)
     enum bool args_left;
     struct flags flag;
     struct arch_flag *arch_flags;
-    unsigned long narch_flags;
+    uint32_t narch_flags;
     enum bool all_archs;
 
 	progname = argv[0];
@@ -213,7 +217,7 @@ void *cookie)
 {
     struct flags *flag;
     uint64_t seg_sum, sect_sum;
-    unsigned long i, j;
+    uint32_t i, j;
     struct load_command *lc;
     struct segment_command *sg;
     struct segment_command_64 *sg64;

@@ -1,4 +1,4 @@
-.TH NM 1 "July 28, 2005" "Apple Computer, Inc."
+.TH NM 1 "May 27, 2015" "Apple, Inc."
 .SH NAME
 nm \- display name list (symbol table)
 .SH SYNOPSIS
@@ -109,6 +109,9 @@ Sort in reverse order.
 .B  \-u
 Display only undefined symbols.
 .TP
+.B  \-U
+Don't display undefined symbols.
+.TP
 .B  \-m
 Display the N_SECT type symbols (Mach-O symbols) as
 .RI ( "segment_name, section_name" )
@@ -185,6 +188,12 @@ The value shall be written in octal.
 .TP
 .I x
 The value shall be written in hexadecimal.
+.TP
+.B \-L
+Display the symbols in the bitcode files in the (\_\^\_LLVM,\_\^\_bundle)
+section if present instead of the object's symbol table.  This is the default
+if the object has no symbol table and there is an (\_\^\_LLVM,\_\^\_bundle)
+section.
 .SH SEE ALSO
 ar(1), ar(5), Mach-O(5), stab(5), nlist(3)
 .SH BUGS

@@ -32,183 +32,6 @@
 #ifndef	_MACH_I386__STRUCTS_H_
 #define	_MACH_I386__STRUCTS_H_
 
-#if __DARWIN_UNIX03
-#define i386_exception_state __darwin_i386_exception_state 
-#define i386_float_state __darwin_i386_float_state 
-#define i386_thread_state __darwin_i386_thread_state
-#define __cr cr
-#define __ctr ctr
-#define __dar dar
-#define __dsisr dsisr
-#define __exception exception
-#define __fpregs fpregs
-#define __fpscr fpscr
-#define __fpscr_pad fpscr_pad
-#define __lr lr
-#define __mq mq
-#define __pad0 pad0
-#define __pad1 pad1
-#define __r0 r0
-#define __r1 r1
-#define __r10 r10
-#define __r11 r11
-#define __r12 r12
-#define __r13 r13
-#define __r14 r14
-#define __r15 r15
-#define __r16 r16
-#define __r17 r17
-#define __r18 r18
-#define __r19 r19
-#define __r2 r2
-#define __r20 r20
-#define __r21 r21
-#define __r22 r22
-#define __r23 r23
-#define __r24 r24
-#define __r25 r25
-#define __r26 r26
-#define __r27 r27
-#define __r28 r28
-#define __r29 r29
-#define __r3 r3
-#define __r30 r30
-#define __r31 r31
-#define __r4 r4
-#define __r5 r5
-#define __r6 r6
-#define __r7 r7
-#define __r8 r8
-#define __r9 r9
-#define __srr0 srr0
-#define __srr1 srr1
-#define __vrsave vrsave
-#define __xer xer
-#define __busy busy
-#define __c0 c0
-#define __c1 c1
-#define __c2 c2
-#define __c3 c3
-#define __cs cs
-#define __darwin_fp_control fp_control
-#define __darwin_fp_status fp_status
-#define __darwin_mmst_reg mmst_reg
-#define __darwin_xmm_reg xmm_reg
-#define __denorm denorm
-#define __ds ds
-#define __eax eax
-#define __ebp ebp
-#define __ebx ebx
-#define __ecx ecx
-#define __edi edi
-#define __edx edx
-#define __eflags eflags
-#define __eip eip
-#define __err err
-#define __errsumm errsumm
-#define __es es
-#define __esi esi
-#define __esp esp
-#define __faultvaddr faultvaddr
-#define __fpu_cs fpu_cs
-#define __fpu_dp fpu_dp
-#define __fpu_ds fpu_ds
-#define __fpu_fcw fpu_fcw
-#define __fpu_fop fpu_fop
-#define __fpu_fsw fpu_fsw
-#define __fpu_ftw fpu_ftw
-#define __fpu_ip fpu_ip
-#define __fpu_mxcsr fpu_mxcsr
-#define __fpu_mxcsrmask fpu_mxcsrmask
-#define __fpu_reserved fpu_reserved
-#define __fpu_reserved1 fpu_reserved1
-#define __fpu_rsrv1 fpu_rsrv1
-#define __fpu_rsrv2 fpu_rsrv2
-#define __fpu_rsrv3 fpu_rsrv3
-#define __fpu_rsrv4 fpu_rsrv4
-#define __fpu_stmm0 fpu_stmm0
-#define __fpu_stmm1 fpu_stmm1
-#define __fpu_stmm2 fpu_stmm2
-#define __fpu_stmm3 fpu_stmm3
-#define __fpu_stmm4 fpu_stmm4
-#define __fpu_stmm5 fpu_stmm5
-#define __fpu_stmm6 fpu_stmm6
-#define __fpu_stmm7 fpu_stmm7
-#define __fpu_xmm0 fpu_xmm0
-#define __fpu_xmm1 fpu_xmm1
-#define __fpu_xmm2 fpu_xmm2
-#define __fpu_xmm3 fpu_xmm3
-#define __fpu_xmm4 fpu_xmm4
-#define __fpu_xmm5 fpu_xmm5
-#define __fpu_xmm6 fpu_xmm6
-#define __fpu_xmm7 fpu_xmm7
-#define __fpu_xmm8 fpu_xmm8
-#define __fpu_xmm9 fpu_xmm9
-#define __fpu_xmm10 fpu_xmm10
-#define __fpu_xmm11 fpu_xmm11
-#define __fpu_xmm12 fpu_xmm12
-#define __fpu_xmm13 fpu_xmm13
-#define __fpu_xmm14 fpu_xmm14
-#define __fpu_xmm15 fpu_xmm15
-#define __fs fs
-#define __gs gs
-#define __invalid invalid
-#define __mmst_reg mmst_reg
-#define __mmst_rsrv mmst_rsrv
-#define __ovrfl ovrfl
-#define __pc pc
-#define __precis precis
-#define __rc rc
-#define __ss ss
-#define __stkflt stkflt
-#define __tos tos
-#define __trapno trapno
-#define __undfl undfl
-#define __xmm_reg xmm_reg
-#define __zdiv zdiv
-
-#define __rax rax
-#define __rbx rbx
-#define __rcx rcx
-#define __rdx rdx
-#define __rdi rdi
-#define __rsi rsi
-#define __rbp rbp
-#define __rsp rsp
-#define __r8 r8
-#define __r9 r9
-#define __r10 r10
-#define __r11 r11
-#define __r12 r12
-#define __r13 r13
-#define __r14 r14
-#define __r15 r15
-#define __rip rip
-#define __rflags rflags
-
-#define __dr0 dr0
-#define __dr1 dr1
-#define __dr2 dr2
-#define __dr3 dr3
-#define __dr4 dr4
-#define __dr5 dr5
-#define __dr6 dr6
-#define __dr7 dr7
-
-#else
-
-#define __darwin_i386_exception_state i386_exception_state
-#define __darwin_i386_float_state i386_float_state
-#define __darwin_i386_thread_state i386_thread_state
-
-#endif
-
-#include <stdint.h>
-#define __uint8_t uint8_t
-#define __uint16_t uint16_t
-#define __uint32_t uint32_t
-#define __uint64_t uint64_t
-
 /*
  * i386 is the structure that is exported to user threads for 
  * use in status/mutate calls.  This structure should never change.
@@ -219,7 +42,7 @@
 #define	_STRUCT_X86_THREAD_STATE32	struct __darwin_i386_thread_state
 _STRUCT_X86_THREAD_STATE32
 {
-    unsigned int    __eax;
+    unsigned int	__eax;
     unsigned int	__ebx;
     unsigned int	__ecx;
     unsigned int	__edx;
@@ -441,6 +264,53 @@ _STRUCT_X86_FLOAT_STATE32
 	char			__fpu_rsrv4[14*16];	/* reserved */
 	int 			__fpu_reserved1;
 };
+
+#define	_STRUCT_X86_AVX_STATE32	struct __darwin_i386_avx_state
+_STRUCT_X86_AVX_STATE32
+{
+	int 			__fpu_reserved[2];
+	_STRUCT_FP_CONTROL	__fpu_fcw;		/* x87 FPU control word */
+	_STRUCT_FP_STATUS	__fpu_fsw;		/* x87 FPU status word */
+	__uint8_t		__fpu_ftw;		/* x87 FPU tag word */
+	__uint8_t		__fpu_rsrv1;		/* reserved */ 
+	__uint16_t		__fpu_fop;		/* x87 FPU Opcode */
+	__uint32_t		__fpu_ip;		/* x87 FPU Instruction Pointer offset */
+	__uint16_t		__fpu_cs;		/* x87 FPU Instruction Pointer Selector */
+	__uint16_t		__fpu_rsrv2;		/* reserved */
+	__uint32_t		__fpu_dp;		/* x87 FPU Instruction Operand(Data) Pointer offset */
+	__uint16_t		__fpu_ds;		/* x87 FPU Instruction Operand(Data) Pointer Selector */
+	__uint16_t		__fpu_rsrv3;		/* reserved */
+	__uint32_t		__fpu_mxcsr;		/* MXCSR Register state */
+	__uint32_t		__fpu_mxcsrmask;	/* MXCSR mask */
+	_STRUCT_MMST_REG	__fpu_stmm0;		/* ST0/MM0   */
+	_STRUCT_MMST_REG	__fpu_stmm1;		/* ST1/MM1  */
+	_STRUCT_MMST_REG	__fpu_stmm2;		/* ST2/MM2  */
+	_STRUCT_MMST_REG	__fpu_stmm3;		/* ST3/MM3  */
+	_STRUCT_MMST_REG	__fpu_stmm4;		/* ST4/MM4  */
+	_STRUCT_MMST_REG	__fpu_stmm5;		/* ST5/MM5  */
+	_STRUCT_MMST_REG	__fpu_stmm6;		/* ST6/MM6  */
+	_STRUCT_MMST_REG	__fpu_stmm7;		/* ST7/MM7  */
+	_STRUCT_XMM_REG		__fpu_xmm0;		/* XMM 0  */
+	_STRUCT_XMM_REG		__fpu_xmm1;		/* XMM 1  */
+	_STRUCT_XMM_REG		__fpu_xmm2;		/* XMM 2  */
+	_STRUCT_XMM_REG		__fpu_xmm3;		/* XMM 3  */
+	_STRUCT_XMM_REG		__fpu_xmm4;		/* XMM 4  */
+	_STRUCT_XMM_REG		__fpu_xmm5;		/* XMM 5  */
+	_STRUCT_XMM_REG		__fpu_xmm6;		/* XMM 6  */
+	_STRUCT_XMM_REG		__fpu_xmm7;		/* XMM 7  */
+	char			__fpu_rsrv4[14*16];	/* reserved */
+	int 			__fpu_reserved1;
+	char			__avx_reserved1[64];
+	_STRUCT_XMM_REG		__fpu_ymmh0;		/* YMMH 0  */
+	_STRUCT_XMM_REG		__fpu_ymmh1;		/* YMMH 1  */
+	_STRUCT_XMM_REG		__fpu_ymmh2;		/* YMMH 2  */
+	_STRUCT_XMM_REG		__fpu_ymmh3;		/* YMMH 3  */
+	_STRUCT_XMM_REG		__fpu_ymmh4;		/* YMMH 4  */
+	_STRUCT_XMM_REG		__fpu_ymmh5;		/* YMMH 5  */
+	_STRUCT_XMM_REG		__fpu_ymmh6;		/* YMMH 6  */
+	_STRUCT_XMM_REG		__fpu_ymmh7;		/* YMMH 7  */
+};
+
 #else /* !__DARWIN_UNIX03 */
 #define	_STRUCT_X86_FLOAT_STATE32	struct i386_float_state
 _STRUCT_X86_FLOAT_STATE32
@@ -478,23 +348,72 @@ _STRUCT_X86_FLOAT_STATE32
 	char			fpu_rsrv4[14*16];	/* reserved */
 	int 			fpu_reserved1;
 };
+
+#define	_STRUCT_X86_AVX_STATE32	struct i386_avx_state
+_STRUCT_X86_AVX_STATE32
+{
+	int 			fpu_reserved[2];
+	_STRUCT_FP_CONTROL	fpu_fcw;		/* x87 FPU control word */
+	_STRUCT_FP_STATUS	fpu_fsw;		/* x87 FPU status word */
+	__uint8_t		fpu_ftw;		/* x87 FPU tag word */
+	__uint8_t		fpu_rsrv1;		/* reserved */ 
+	__uint16_t		fpu_fop;		/* x87 FPU Opcode */
+	__uint32_t		fpu_ip;			/* x87 FPU Instruction Pointer offset */
+	__uint16_t		fpu_cs;			/* x87 FPU Instruction Pointer Selector */
+	__uint16_t		fpu_rsrv2;		/* reserved */
+	__uint32_t		fpu_dp;			/* x87 FPU Instruction Operand(Data) Pointer offset */
+	__uint16_t		fpu_ds;			/* x87 FPU Instruction Operand(Data) Pointer Selector */
+	__uint16_t		fpu_rsrv3;		/* reserved */
+	__uint32_t		fpu_mxcsr;		/* MXCSR Register state */
+	__uint32_t		fpu_mxcsrmask;		/* MXCSR mask */
+	_STRUCT_MMST_REG	fpu_stmm0;		/* ST0/MM0   */
+	_STRUCT_MMST_REG	fpu_stmm1;		/* ST1/MM1  */
+	_STRUCT_MMST_REG	fpu_stmm2;		/* ST2/MM2  */
+	_STRUCT_MMST_REG	fpu_stmm3;		/* ST3/MM3  */
+	_STRUCT_MMST_REG	fpu_stmm4;		/* ST4/MM4  */
+	_STRUCT_MMST_REG	fpu_stmm5;		/* ST5/MM5  */
+	_STRUCT_MMST_REG	fpu_stmm6;		/* ST6/MM6  */
+	_STRUCT_MMST_REG	fpu_stmm7;		/* ST7/MM7  */
+	_STRUCT_XMM_REG		fpu_xmm0;		/* XMM 0  */
+	_STRUCT_XMM_REG		fpu_xmm1;		/* XMM 1  */
+	_STRUCT_XMM_REG		fpu_xmm2;		/* XMM 2  */
+	_STRUCT_XMM_REG		fpu_xmm3;		/* XMM 3  */
+	_STRUCT_XMM_REG		fpu_xmm4;		/* XMM 4  */
+	_STRUCT_XMM_REG		fpu_xmm5;		/* XMM 5  */
+	_STRUCT_XMM_REG		fpu_xmm6;		/* XMM 6  */
+	_STRUCT_XMM_REG		fpu_xmm7;		/* XMM 7  */
+	char			fpu_rsrv4[14*16];	/* reserved */
+	int 			fpu_reserved1;
+	char			__avx_reserved1[64];
+	_STRUCT_XMM_REG		__fpu_ymmh0;		/* YMMH 0  */
+	_STRUCT_XMM_REG		__fpu_ymmh1;		/* YMMH 1  */
+	_STRUCT_XMM_REG		__fpu_ymmh2;		/* YMMH 2  */
+	_STRUCT_XMM_REG		__fpu_ymmh3;		/* YMMH 3  */
+	_STRUCT_XMM_REG		__fpu_ymmh4;		/* YMMH 4  */
+	_STRUCT_XMM_REG		__fpu_ymmh5;		/* YMMH 5  */
+	_STRUCT_XMM_REG		__fpu_ymmh6;		/* YMMH 6  */
+	_STRUCT_XMM_REG		__fpu_ymmh7;		/* YMMH 7  */
+};
+
 #endif /* !__DARWIN_UNIX03 */
 
 #if __DARWIN_UNIX03
 #define _STRUCT_X86_EXCEPTION_STATE32	struct __darwin_i386_exception_state
 _STRUCT_X86_EXCEPTION_STATE32
 {
-    unsigned int	__trapno;
-    unsigned int	__err;
-    unsigned int	__faultvaddr;
+	__uint16_t	__trapno;
+	__uint16_t	__cpu;
+	__uint32_t	__err;
+	__uint32_t	__faultvaddr;
 };
 #else /* !__DARWIN_UNIX03 */
 #define _STRUCT_X86_EXCEPTION_STATE32	struct i386_exception_state
 _STRUCT_X86_EXCEPTION_STATE32
 {
-    unsigned int	trapno;
-    unsigned int	err;
-    unsigned int	faultvaddr;
+	__uint16_t	trapno;
+	__uint16_t	cpu;
+	__uint32_t	err;
+	__uint32_t	faultvaddr;
 };
 #endif /* !__DARWIN_UNIX03 */
 
@@ -636,6 +555,75 @@ _STRUCT_X86_FLOAT_STATE64
 	char			__fpu_rsrv4[6*16];	/* reserved */
 	int 			__fpu_reserved1;
 };
+
+#define	_STRUCT_X86_AVX_STATE64	struct __darwin_x86_avx_state64
+_STRUCT_X86_AVX_STATE64
+{
+	int 			__fpu_reserved[2];
+	_STRUCT_FP_CONTROL	__fpu_fcw;		/* x87 FPU control word */
+	_STRUCT_FP_STATUS	__fpu_fsw;		/* x87 FPU status word */
+	__uint8_t		__fpu_ftw;		/* x87 FPU tag word */
+	__uint8_t		__fpu_rsrv1;		/* reserved */ 
+	__uint16_t		__fpu_fop;		/* x87 FPU Opcode */
+
+	/* x87 FPU Instruction Pointer */
+	__uint32_t		__fpu_ip;		/* offset */
+	__uint16_t		__fpu_cs;		/* Selector */
+
+	__uint16_t		__fpu_rsrv2;		/* reserved */
+
+	/* x87 FPU Instruction Operand(Data) Pointer */
+	__uint32_t		__fpu_dp;		/* offset */
+	__uint16_t		__fpu_ds;		/* Selector */
+
+	__uint16_t		__fpu_rsrv3;		/* reserved */
+	__uint32_t		__fpu_mxcsr;		/* MXCSR Register state */
+	__uint32_t		__fpu_mxcsrmask;	/* MXCSR mask */
+	_STRUCT_MMST_REG	__fpu_stmm0;		/* ST0/MM0   */
+	_STRUCT_MMST_REG	__fpu_stmm1;		/* ST1/MM1  */
+	_STRUCT_MMST_REG	__fpu_stmm2;		/* ST2/MM2  */
+	_STRUCT_MMST_REG	__fpu_stmm3;		/* ST3/MM3  */
+	_STRUCT_MMST_REG	__fpu_stmm4;		/* ST4/MM4  */
+	_STRUCT_MMST_REG	__fpu_stmm5;		/* ST5/MM5  */
+	_STRUCT_MMST_REG	__fpu_stmm6;		/* ST6/MM6  */
+	_STRUCT_MMST_REG	__fpu_stmm7;		/* ST7/MM7  */
+	_STRUCT_XMM_REG		__fpu_xmm0;		/* XMM 0  */
+	_STRUCT_XMM_REG		__fpu_xmm1;		/* XMM 1  */
+	_STRUCT_XMM_REG		__fpu_xmm2;		/* XMM 2  */
+	_STRUCT_XMM_REG		__fpu_xmm3;		/* XMM 3  */
+	_STRUCT_XMM_REG		__fpu_xmm4;		/* XMM 4  */
+	_STRUCT_XMM_REG		__fpu_xmm5;		/* XMM 5  */
+	_STRUCT_XMM_REG		__fpu_xmm6;		/* XMM 6  */
+	_STRUCT_XMM_REG		__fpu_xmm7;		/* XMM 7  */
+	_STRUCT_XMM_REG		__fpu_xmm8;		/* XMM 8  */
+	_STRUCT_XMM_REG		__fpu_xmm9;		/* XMM 9  */
+	_STRUCT_XMM_REG		__fpu_xmm10;		/* XMM 10  */
+	_STRUCT_XMM_REG		__fpu_xmm11;		/* XMM 11 */
+	_STRUCT_XMM_REG		__fpu_xmm12;		/* XMM 12  */
+	_STRUCT_XMM_REG		__fpu_xmm13;		/* XMM 13  */
+	_STRUCT_XMM_REG		__fpu_xmm14;		/* XMM 14  */
+	_STRUCT_XMM_REG		__fpu_xmm15;		/* XMM 15  */
+	char			__fpu_rsrv4[6*16];	/* reserved */
+	int 			__fpu_reserved1;
+	char			__avx_reserved1[64];
+	_STRUCT_XMM_REG		__fpu_ymmh0;		/* YMMH 0  */
+	_STRUCT_XMM_REG		__fpu_ymmh1;		/* YMMH 1  */
+	_STRUCT_XMM_REG		__fpu_ymmh2;		/* YMMH 2  */
+	_STRUCT_XMM_REG		__fpu_ymmh3;		/* YMMH 3  */
+	_STRUCT_XMM_REG		__fpu_ymmh4;		/* YMMH 4  */
+	_STRUCT_XMM_REG		__fpu_ymmh5;		/* YMMH 5  */
+	_STRUCT_XMM_REG		__fpu_ymmh6;		/* YMMH 6  */
+	_STRUCT_XMM_REG		__fpu_ymmh7;		/* YMMH 7  */
+	_STRUCT_XMM_REG		__fpu_ymmh8;		/* YMMH 8  */
+	_STRUCT_XMM_REG		__fpu_ymmh9;		/* YMMH 9  */
+	_STRUCT_XMM_REG		__fpu_ymmh10;		/* YMMH 10  */
+	_STRUCT_XMM_REG		__fpu_ymmh11;		/* YMMH 11  */
+	_STRUCT_XMM_REG		__fpu_ymmh12;		/* YMMH 12  */
+	_STRUCT_XMM_REG		__fpu_ymmh13;		/* YMMH 13  */
+	_STRUCT_XMM_REG		__fpu_ymmh14;		/* YMMH 14  */
+	_STRUCT_XMM_REG		__fpu_ymmh15;		/* YMMH 15  */
+};
+
 #else /* !__DARWIN_UNIX03 */
 #define	_STRUCT_X86_FLOAT_STATE64	struct x86_float_state64
 _STRUCT_X86_FLOAT_STATE64
@@ -687,23 +675,94 @@ _STRUCT_X86_FLOAT_STATE64
 	char			fpu_rsrv4[6*16];	/* reserved */
 	int 			fpu_reserved1;
 };
+
+#define	_STRUCT_X86_AVX_STATE64	struct x86_avx_state64
+_STRUCT_X86_AVX_STATE64
+{
+	int 			fpu_reserved[2];
+	_STRUCT_FP_CONTROL	fpu_fcw;		/* x87 FPU control word */
+	_STRUCT_FP_STATUS	fpu_fsw;		/* x87 FPU status word */
+	__uint8_t		fpu_ftw;		/* x87 FPU tag word */
+	__uint8_t		fpu_rsrv1;		/* reserved */ 
+	__uint16_t		fpu_fop;		/* x87 FPU Opcode */
+
+	/* x87 FPU Instruction Pointer */
+	__uint32_t		fpu_ip;			/* offset */
+	__uint16_t		fpu_cs;			/* Selector */
+
+	__uint16_t		fpu_rsrv2;		/* reserved */
+
+	/* x87 FPU Instruction Operand(Data) Pointer */
+	__uint32_t		fpu_dp;			/* offset */
+	__uint16_t		fpu_ds;			/* Selector */
+
+	__uint16_t		fpu_rsrv3;		/* reserved */
+	__uint32_t		fpu_mxcsr;		/* MXCSR Register state */
+	__uint32_t		fpu_mxcsrmask;		/* MXCSR mask */
+	_STRUCT_MMST_REG	fpu_stmm0;		/* ST0/MM0   */
+	_STRUCT_MMST_REG	fpu_stmm1;		/* ST1/MM1  */
+	_STRUCT_MMST_REG	fpu_stmm2;		/* ST2/MM2  */
+	_STRUCT_MMST_REG	fpu_stmm3;		/* ST3/MM3  */
+	_STRUCT_MMST_REG	fpu_stmm4;		/* ST4/MM4  */
+	_STRUCT_MMST_REG	fpu_stmm5;		/* ST5/MM5  */
+	_STRUCT_MMST_REG	fpu_stmm6;		/* ST6/MM6  */
+	_STRUCT_MMST_REG	fpu_stmm7;		/* ST7/MM7  */
+	_STRUCT_XMM_REG		fpu_xmm0;		/* XMM 0  */
+	_STRUCT_XMM_REG		fpu_xmm1;		/* XMM 1  */
+	_STRUCT_XMM_REG		fpu_xmm2;		/* XMM 2  */
+	_STRUCT_XMM_REG		fpu_xmm3;		/* XMM 3  */
+	_STRUCT_XMM_REG		fpu_xmm4;		/* XMM 4  */
+	_STRUCT_XMM_REG		fpu_xmm5;		/* XMM 5  */
+	_STRUCT_XMM_REG		fpu_xmm6;		/* XMM 6  */
+	_STRUCT_XMM_REG		fpu_xmm7;		/* XMM 7  */
+	_STRUCT_XMM_REG		fpu_xmm8;		/* XMM 8  */
+	_STRUCT_XMM_REG		fpu_xmm9;		/* XMM 9  */
+	_STRUCT_XMM_REG		fpu_xmm10;		/* XMM 10  */
+	_STRUCT_XMM_REG		fpu_xmm11;		/* XMM 11 */
+	_STRUCT_XMM_REG		fpu_xmm12;		/* XMM 12  */
+	_STRUCT_XMM_REG		fpu_xmm13;		/* XMM 13  */
+	_STRUCT_XMM_REG		fpu_xmm14;		/* XMM 14  */
+	_STRUCT_XMM_REG		fpu_xmm15;		/* XMM 15  */
+	char			fpu_rsrv4[6*16];	/* reserved */
+	int 			fpu_reserved1;
+	char			__avx_reserved1[64];
+	_STRUCT_XMM_REG		__fpu_ymmh0;		/* YMMH 0  */
+	_STRUCT_XMM_REG		__fpu_ymmh1;		/* YMMH 1  */
+	_STRUCT_XMM_REG		__fpu_ymmh2;		/* YMMH 2  */
+	_STRUCT_XMM_REG		__fpu_ymmh3;		/* YMMH 3  */
+	_STRUCT_XMM_REG		__fpu_ymmh4;		/* YMMH 4  */
+	_STRUCT_XMM_REG		__fpu_ymmh5;		/* YMMH 5  */
+	_STRUCT_XMM_REG		__fpu_ymmh6;		/* YMMH 6  */
+	_STRUCT_XMM_REG		__fpu_ymmh7;		/* YMMH 7  */
+	_STRUCT_XMM_REG		__fpu_ymmh8;		/* YMMH 8  */
+	_STRUCT_XMM_REG		__fpu_ymmh9;		/* YMMH 9  */
+	_STRUCT_XMM_REG		__fpu_ymmh10;		/* YMMH 10  */
+	_STRUCT_XMM_REG		__fpu_ymmh11;		/* YMMH 11  */
+	_STRUCT_XMM_REG		__fpu_ymmh12;		/* YMMH 12  */
+	_STRUCT_XMM_REG		__fpu_ymmh13;		/* YMMH 13  */
+	_STRUCT_XMM_REG		__fpu_ymmh14;		/* YMMH 14  */
+	_STRUCT_XMM_REG		__fpu_ymmh15;		/* YMMH 15  */
+};
+
 #endif /* !__DARWIN_UNIX03 */
 
 #if __DARWIN_UNIX03
 #define _STRUCT_X86_EXCEPTION_STATE64	struct __darwin_x86_exception_state64
 _STRUCT_X86_EXCEPTION_STATE64
 {
-    unsigned int	__trapno;
-    unsigned int	__err;
-    __uint64_t		__faultvaddr;
+    __uint16_t	__trapno;
+    __uint16_t	__cpu;
+    __uint32_t	__err;
+    __uint64_t	__faultvaddr;
 };
 #else /* !__DARWIN_UNIX03 */
 #define _STRUCT_X86_EXCEPTION_STATE64	struct x86_exception_state64
 _STRUCT_X86_EXCEPTION_STATE64
 {
-    unsigned int	trapno;
-    unsigned int	err;
-    __uint64_t		faultvaddr;
+    __uint16_t	trapno;
+    __uint16_t	cpu;
+    __uint32_t	err;
+    __uint64_t	faultvaddr;
 };
 #endif /* !__DARWIN_UNIX03 */
 

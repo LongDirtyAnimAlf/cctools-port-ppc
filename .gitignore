@@ -6,4 +6,7 @@
 
 .*~
 
-./cctools-build
+*.bak
+
+cctools-build/
+backup/

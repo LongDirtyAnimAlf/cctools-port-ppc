@@ -31,9 +31,8 @@
  */
 #include <stdlib.h>
 #if !(defined(KLD) && defined(__STATIC__))
-#include <stdlib.h>
+#include <libc.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <mach/mach.h>
 #else /* defined(KLD) && defined(__STATIC__) */
 #include <mach/kern_return.h>
@@ -68,8 +67,8 @@
 /*
  * The total size of the output file and the memory buffer for the output file.
  */
-unsigned long output_size = 0;
-char *output_addr = NULL;
+__private_extern__ unsigned long output_size = 0;
+__private_extern__ char *output_addr = NULL;
 
 /*
  * This is used to setting the SG_NORELOC flag in the segment flags correctly.
@@ -84,7 +83,7 @@ char *output_addr = NULL;
  * routine set_SG_NORELOC_flags() in here can use these two fields to set the
  * SG_NORELOC flag in the segments that have no relocation to or for them.
  */
-struct merged_section **output_sections = NULL;
+__private_extern__ struct merged_section **output_sections = NULL;
 
 #ifndef RLD
 /* the file descriptor of the output file */
@@ -110,7 +109,7 @@ static void print_block_list(void);
 #endif /* DEBUG */
 static struct block *get_block(void);
 static void remove_block(struct block *block);
-static unsigned long trunc(unsigned long v, unsigned long r);
+static unsigned long trnc(unsigned long v, unsigned long r);
 #endif /* !defined(RLD) */
 static void create_output_sections_array(void);
 static void set_SG_NORELOC_flags(void);
@@ -121,7 +120,7 @@ static void output_headers(void);
  * into.  It drives the process to get everything copied into the buffer for
  * the output file.  It then writes the output file and deallocates the buffer.
  */ 
-extern
+__private_extern__
 void
 pass2(void)
 {
@@ -270,7 +269,7 @@ pass2(void)
 		    }
 		}
 		output_local_symbols();
-#if defined(VM_SYNC_DEACTIVATE) && !defined(_POSIX_C_SOURCE) && !defined(__CYGWIN__)
+#ifdef VM_SYNC_DEACTIVATE
 		vm_msync(mach_task_self(), (vm_address_t)cur_obj->obj_addr,
 			 (vm_size_t)cur_obj->obj_size, VM_SYNC_DEACTIVATE);
 #endif /* VM_SYNC_DEACTIVATE */
@@ -370,7 +369,7 @@ pass2(void)
  * pass2_rld_symfile() drives the process to get everything copied into the
  * buffer for the output file.
  */ 
-extern
+__private_extern__
 void
 pass2_rld_symfile(void)
 {
@@ -400,7 +399,7 @@ pass2_rld_symfile(void)
  * one from the section number) with the section number of a merged symbol that
  * is refered to in a relocation entry.
  */
-extern
+__private_extern__
 void
 create_output_sections_array(void)
 {
@@ -668,7 +667,7 @@ setup_output_flush(void)
  * to prevent these pages to be written to the swap area when they could just be
  * written to the output file (if only external pagers worked well ...).
  */
-extern
+__private_extern__
 void
 output_flush(
 unsigned long offset,
@@ -781,11 +780,11 @@ printf("in output_flush() offset = %lu size = %lu\n", offset, size);
 		else
 		    write_offset =before->written_offset + before->written_size;
 		if(after->written_size == 0)
-		    write_size = trunc(after->offset + after->size -
-				       write_offset, host_pagesize);
+		    write_size = trnc(after->offset + after->size -
+				      write_offset, host_pagesize);
 		else
-		    write_size = trunc(after->written_offset - write_offset,
-				       host_pagesize);
+		    write_size = trnc(after->written_offset - write_offset,
+				      host_pagesize);
 		if(write_size != 0){
 		    before->written_size += write_size;
 		}
@@ -805,7 +804,7 @@ printf("in output_flush() offset = %lu size = %lu\n", offset, size);
 		 * before the new area.
 		 */
 		write_offset = before->written_offset + before->written_size;
-		write_size = trunc(offset + size - write_offset, host_pagesize);
+		write_size = trnc(offset + size - write_offset, host_pagesize);
 		if(write_size != 0)
 		    before->written_size += write_size;
 		before->size += size;
@@ -822,13 +821,13 @@ printf("in output_flush() offset = %lu size = %lu\n", offset, size);
 	     * (if any) ends.  The new area is folded into this block after the
 	     * new area.
 	     */
-	    write_offset = round(offset, host_pagesize);
+	    write_offset = rnd(offset, host_pagesize);
 	    if(after->written_size == 0)
-		write_size = trunc(after->offset + after->size - write_offset,
-				   host_pagesize);
+		write_size = trnc(after->offset + after->size - write_offset,
+				  host_pagesize);
 	    else
-		write_size = trunc(after->written_offset - write_offset,
-				   host_pagesize);
+		write_size = trnc(after->written_offset - write_offset,
+				  host_pagesize);
 	    if(write_size != 0){
 		after->written_offset = write_offset;
 		after->written_size += write_size;
@@ -846,8 +845,8 @@ printf("in output_flush() offset = %lu size = %lu\n", offset, size);
 	     * it (if any) starts.  A new block is created and the new area is
 	     * is placed in it.
 	     */
-	    write_offset = round(offset, host_pagesize);
-	    write_size = trunc(offset + size - write_offset, host_pagesize);
+	    write_offset = rnd(offset, host_pagesize);
+	    write_size = trnc(offset + size - write_offset, host_pagesize);
 	    block = get_block();
 	    block->offset = offset;
 	    block->size = size;
@@ -1004,12 +1003,12 @@ struct block *block)
 }
 
 /*
- * trunc() truncates the value 'v' to the power of two value 'r'.  If v is
+ * trnc() truncates the value 'v' to the power of two value 'r'.  If v is
  * less than zero it returns zero.
  */
 static
 unsigned long
-trunc(
+trnc(
 unsigned long v,
 unsigned long r)
 {

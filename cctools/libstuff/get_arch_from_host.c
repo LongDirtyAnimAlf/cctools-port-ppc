@@ -28,7 +28,7 @@
 #include "stuff/openstep_mach.h"
 #include "stuff/arch.h"
 #include "stuff/allocate.h"
-#include <config.h>
+
 /*
  * get_arch_from_host() gets the architecture from the host this is running on
  * and returns zero if the architecture is not known and zero if the
@@ -44,7 +44,7 @@ struct arch_flag *family_arch_flag,
 struct arch_flag *specific_arch_flag)
 {
     struct host_basic_info host_basic_info;
-    unsigned int count;
+    natural_t count; /* cctools-port: unsigned int -> natural_t */
     kern_return_t r;
     mach_port_t my_mach_host_self;
 
@@ -394,6 +394,126 @@ struct arch_flag *specific_arch_flag)
 		}
 		if(specific_arch_flag != NULL)
 		    specific_arch_flag->name = "sparc";
+		return(1);
+	    }
+	    break;
+	case CPU_TYPE_ARM:
+	    switch(host_basic_info.cpu_subtype){
+	    case CPU_SUBTYPE_ARM_ALL:
+		if(family_arch_flag != NULL){
+		    family_arch_flag->name = "arm";
+		    family_arch_flag->cpusubtype = CPU_SUBTYPE_ARM_ALL;
+		}
+		if(specific_arch_flag != NULL)
+		    specific_arch_flag->name = "arm";
+		return(1);
+	    case CPU_SUBTYPE_ARM_V4T:
+		if(family_arch_flag != NULL){
+		    family_arch_flag->name = "arm";
+		    family_arch_flag->cpusubtype = CPU_SUBTYPE_ARM_ALL;
+		}
+		if(specific_arch_flag != NULL)
+		    specific_arch_flag->name = "armv4t";
+		return(1);
+	    case CPU_SUBTYPE_ARM_V5TEJ:
+		if(family_arch_flag != NULL){
+		    family_arch_flag->name = "arm";
+		    family_arch_flag->cpusubtype = CPU_SUBTYPE_ARM_ALL;
+		}
+		if(specific_arch_flag != NULL)
+		    specific_arch_flag->name = "armv5";
+		return(1);
+	    case CPU_SUBTYPE_ARM_XSCALE:
+		if(family_arch_flag != NULL){
+		    family_arch_flag->name = "arm";
+		    family_arch_flag->cpusubtype = CPU_SUBTYPE_ARM_ALL;
+		}
+		if(specific_arch_flag != NULL)
+		    specific_arch_flag->name = "xscale";
+		return(1);
+	    case CPU_SUBTYPE_ARM_V6:
+		if(family_arch_flag != NULL){
+		    family_arch_flag->name = "arm";
+		    family_arch_flag->cpusubtype = CPU_SUBTYPE_ARM_ALL;
+		}
+		if(specific_arch_flag != NULL)
+		    specific_arch_flag->name = "armv6";
+		return(1);
+	    case CPU_SUBTYPE_ARM_V6M:
+		if(family_arch_flag != NULL){
+		    family_arch_flag->name = "arm";
+		    family_arch_flag->cpusubtype = CPU_SUBTYPE_ARM_ALL;
+		}
+		if(specific_arch_flag != NULL)
+		    specific_arch_flag->name = "armv6m";
+		return(1);
+	    case CPU_SUBTYPE_ARM_V7:
+		if(family_arch_flag != NULL){
+		    family_arch_flag->name = "arm";
+		    family_arch_flag->cpusubtype = CPU_SUBTYPE_ARM_ALL;
+		}
+		if(specific_arch_flag != NULL)
+		    specific_arch_flag->name = "armv7";
+		return(1);
+	    case CPU_SUBTYPE_ARM_V7F:
+		if(family_arch_flag != NULL){
+		    family_arch_flag->name = "arm";
+		    family_arch_flag->cpusubtype = CPU_SUBTYPE_ARM_ALL;
+		}
+		if(specific_arch_flag != NULL)
+		    specific_arch_flag->name = "armv7f";
+		return(1);
+	    case CPU_SUBTYPE_ARM_V7S:
+		if(family_arch_flag != NULL){
+		    family_arch_flag->name = "arm";
+		    family_arch_flag->cpusubtype = CPU_SUBTYPE_ARM_ALL;
+		}
+		if(specific_arch_flag != NULL)
+		    specific_arch_flag->name = "armv7s";
+		return(1);
+	    case CPU_SUBTYPE_ARM_V7K:
+		if(family_arch_flag != NULL){
+		    family_arch_flag->name = "arm";
+		    family_arch_flag->cpusubtype = CPU_SUBTYPE_ARM_ALL;
+		}
+		if(specific_arch_flag != NULL)
+		    specific_arch_flag->name = "armv7k";
+		return(1);
+	    case CPU_SUBTYPE_ARM_V7M:
+		if(family_arch_flag != NULL){
+		    family_arch_flag->name = "arm";
+		    family_arch_flag->cpusubtype = CPU_SUBTYPE_ARM_ALL;
+		}
+		if(specific_arch_flag != NULL)
+		    specific_arch_flag->name = "armv7m";
+		return(1);
+	    case CPU_SUBTYPE_ARM_V7EM:
+		if(family_arch_flag != NULL){
+		    family_arch_flag->name = "arm";
+		    family_arch_flag->cpusubtype = CPU_SUBTYPE_ARM_ALL;
+		}
+		if(specific_arch_flag != NULL)
+		    specific_arch_flag->name = "armv7em";
+		return(1);
+	    }
+	    break;
+	case CPU_TYPE_ARM64:
+	    switch(host_basic_info.cpu_subtype){
+	    case CPU_SUBTYPE_ARM64_ALL:
+		if(family_arch_flag != NULL){
+		    family_arch_flag->name = "arm64";
+		    family_arch_flag->cpusubtype = CPU_SUBTYPE_ARM64_ALL;
+		}
+		if(specific_arch_flag != NULL)
+		    specific_arch_flag->name = "arm64";
+		return(1);
+	    case CPU_SUBTYPE_ARM64_V8:
+		if(family_arch_flag != NULL){
+		    family_arch_flag->name = "arm64";
+		    family_arch_flag->cpusubtype = CPU_SUBTYPE_ARM64_ALL;
+		}
+		if(specific_arch_flag != NULL)
+		    specific_arch_flag->name = "arm64v8";
 		return(1);
 	    }
 	    break;

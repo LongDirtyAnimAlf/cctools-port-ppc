@@ -68,7 +68,7 @@ static char rcsid[] = "$NetBSD: archive.c,v 1.7 1995/03/26 03:27:46 glass Exp $"
 
 #include <sys/param.h>
 #include <sys/stat.h>
-#include <sys/file.h>
+#include <sys/file.h> /* cctools-port */
 
 #include <ar.h>
 #include <dirent.h>
@@ -89,6 +89,10 @@ typedef struct ar_hdr HDR;
 static char hb[sizeof(HDR) + 1];	/* real header */
 
 int archive_opened_for_writing = 0;
+
+#ifndef DEFFILEMODE
+#define DEFFILEMODE S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH
+#endif
 
 int
 open_archive(mode)
@@ -114,6 +118,9 @@ open_archive(mode)
 	if ((fd = open(archive, mode, DEFFILEMODE)) < 0)
 		error(archive);
 
+	if((mode & O_ACCMODE) == O_RDONLY | O_BINARY)
+	    goto skip_flock;
+
 	/* 
 	 * Attempt to place a lock on the opened file - if we get an 
 	 * error then someone is already working on this library (or
@@ -121,6 +128,18 @@ open_archive(mode)
 	 */
 opened:
 	r = flock(fd, LOCK_EX|LOCK_NB);
+	if (r && errno == EAGAIN) {
+		/*
+		 * If we get EAGAIN sleep for a second and loop up to 10 times
+		 * trying again.
+		 */
+		static int tries = 0;
+
+		sleep(1);
+		tries++;
+		if (tries < 10)
+		    goto opened;
+	}
 	if (r) {
 		switch (errno)
 		{
@@ -152,26 +171,29 @@ opened:
 		/* Locking seems to not be working */
 		case ENOTSUP:
 		case EHOSTUNREACH:
-		/*case EBADRPC:*/
+#ifdef __APPLE__ /* cctools-port */
+		case EBADRPC:
+#endif /* __APPLE__ */
 		default:
 			/* Filesystem does not support locking */
 			break;
 		}
 	}
+skip_flock:
 
 	/*
-	 * If not created, O_RDONLY|O_RDWR indicates that it has to be
+	 * If not created, O_RDONLY | O_BINARY|O_RDWR indicates that it has to be
 	 * in archive format.
 	 */
 	if (!created &&
-	    ((mode & O_ACCMODE) == O_RDONLY || (mode & O_ACCMODE) == O_RDWR)) {
+	    ((mode & O_ACCMODE) == O_RDONLY | O_BINARY || (mode & O_ACCMODE) == O_RDWR)) {
 		if ((nr = read(fd, buf, SARMAG) != SARMAG)) {
 			if (nr >= 0)
 				badfmt();
 			error(archive);
 		} else if (bcmp(buf, ARMAG, SARMAG)) {
-			unsigned long magic;
-			memcpy(&magic, buf, sizeof(unsigned long));
+			uint32_t magic;
+			memcpy(&magic, buf, sizeof(uint32_t));
 #ifdef __BIG_ENDIAN__
 			if(magic == FAT_MAGIC)
 #endif /* __BIG_ENDIAN__ */
@@ -288,6 +310,7 @@ put_arobj(cfp, sb)
 	char *name;
 	struct ar_hdr *hdr;
 	off_t size;
+	long int tv_sec;
 
 	/*
 	 * If passed an sb structure, reading a file from disk.  Get stat(2)
@@ -298,6 +321,17 @@ put_arobj(cfp, sb)
 	if (sb) {
 		name = rname(cfp->rname);
 		(void)fstat(cfp->rfd, sb);
+
+		/*
+		 * The environment variable ZERO_AR_DATE is used here and other
+		 * places that write archives to allow testing and comparing
+		 * things for exact binary equality.
+		 */
+		if (getenv("ZERO_AR_DATE") == NULL)
+			/* cctools-port: sb->st_mtimespec.tv_sec -> sb->st_mtime */
+			tv_sec = (long int)sb->st_mtime;
+		else
+			tv_sec = (long int)0;
 
 		/*
 		 * If not truncating names and the name is too long or contains
@@ -311,24 +345,27 @@ put_arobj(cfp, sb)
 				    name, OLDARMAXNAME, name);
 				(void)fflush(stderr);
 			}
-			(void)sprintf(hb, HDR3, name, (long int)sb->st_mtime,
+			(void)sprintf(hb, HDR3, name, (long int)tv_sec,
 			    (unsigned int)(u_short)sb->st_uid,
 			    (unsigned int)(u_short)sb->st_gid,
-			    sb->st_mode, (long long int) sb->st_size, ARFMAG);
+			    /* cctools-port: int64_t cast */
+			    sb->st_mode, (int64_t)sb->st_size, ARFMAG);
 			lname = 0;
 		} else if (lname > sizeof(hdr->ar_name) || strchr(name, ' '))
 			(void)sprintf(hb, HDR1, AR_EFMT1, (lname + 3) & ~3,
-			    (long int)sb->st_mtime,
+			    (long int)tv_sec,
 			    (unsigned int)(u_short)sb->st_uid,
 			    (unsigned int)(u_short)sb->st_gid,
-			    sb->st_mode, (long long int) sb->st_size + ((lname + 3) & ~3),
+			    /* cctools-port: int64_t casts */
+			    sb->st_mode, (int64_t)sb->st_size + (int64_t)((lname + 3) & ~3),
 			    ARFMAG);
 		else {
 			lname = 0;
-			(void)sprintf(hb, HDR2, name, (long int)sb->st_mtime,
+			(void)sprintf(hb, HDR2, name, (long int)tv_sec,
 			    (unsigned int)(u_short)sb->st_uid,
 			    (unsigned int)(u_short)sb->st_gid,
-			    sb->st_mode, (long long int) sb->st_size, ARFMAG);
+			    /* cctools-port: int64_t cast */
+			    sb->st_mode, (int64_t)sb->st_size, ARFMAG);
 		}
 		size = sb->st_size;
 	} else {
