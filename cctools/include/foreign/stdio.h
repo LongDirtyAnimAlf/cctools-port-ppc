@@ -9,6 +9,10 @@
 #undef __STRICT_ANSI__
 #endif /* __CYGWIN__ */
 
+#ifndef O_BINARY
+#define O_BINARY 0
+#endif
+
 #include_next <stdio.h>
 
 #ifdef __CYGWIN__
